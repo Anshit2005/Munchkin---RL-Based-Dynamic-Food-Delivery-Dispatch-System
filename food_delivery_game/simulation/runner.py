@@ -12,6 +12,7 @@ class EpisodeMetrics:
     strategy: str
     seed: int
     delivered: int
+    total_reward: float
     average_delivery_time: float
     total_travel_distance: float
 
@@ -28,6 +29,7 @@ def run_episode(strategy: str, config: SimulationConfig, seed: int | None = None
         strategy=strategy,
         seed=config.seed if seed is None else seed,
         delivered=len(env.delivered_orders),
+        total_reward=env.total_reward,
         average_delivery_time=sum(delivery_times) / len(delivery_times) if delivery_times else 0.0,
         total_travel_distance=env.total_travel_distance,
     )
@@ -43,12 +45,13 @@ def compare_policies(config: SimulationConfig, episodes: int = 20) -> dict[str, 
     }
 
 
-def average_metrics(results: list[EpisodeMetrics]) -> tuple[float, float, float]:
+def average_metrics(results: list[EpisodeMetrics]) -> tuple[float, float, float, float]:
     count = len(results)
     if count == 0:
-        return 0.0, 0.0, 0.0
+        return 0.0, 0.0, 0.0, 0.0
     return (
         sum(r.delivered for r in results) / count,
+        sum(r.total_reward for r in results) / count,
         sum(r.average_delivery_time for r in results) / count,
         sum(r.total_travel_distance for r in results) / count,
     )

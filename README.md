@@ -17,7 +17,7 @@ From the project root:
 python3 -m food_delivery_game
 ```
 
-Use **Start / Pause** to advance the simulation and **Reset** to start a new scenario. Configure restaurants, drivers, order arrival rate, and travel speed before starting. Episodes run for a fixed three simulated minutes.
+Use **Start / Pause** to advance the simulation and **Reset** to start a new scenario. Configure restaurants, drivers, and order arrival rate before starting. Episodes run for a fixed three simulated minutes; automatic play advances one simulated minute every five seconds, while **Step one minute** advances immediately. The live dashboard tracks elapsed simulation time, deliveries, average delivery time, travel distance, free drivers, and reward points. Each completed delivery earns 10 points; the episode-end summary shows the final score and results. Delivery and episode sounds use the system bell and can be switched off in the controls.
 
 ## Compare the baselines
 
@@ -45,6 +45,6 @@ food_delivery_game/
 
 ## Current scope
 
-The environment supports order arrivals, preparation, driver dispatch, travel, pickups, and deliveries. The three baselines are nearest driver, oldest/most urgent ready order, and minimum estimated delivery time. The comparison runner reports average deliveries, delivery time, and travel distance over matched episode seeds. The GUI lets you run a selected baseline or compare all three. PPO is planned for a later commit.
+The environment supports order arrivals, preparation, driver dispatch, travel, pickups, and deliveries. The three baselines are nearest driver, oldest/most urgent ready order, and minimum estimated delivery time. The comparison runner reports average deliveries, reward points, delivery time, and travel distance over matched episode seeds. The GUI lets you run a selected baseline or compare all three. PPO is planned for a later commit.
 
 The current simulator uses a lightweight 2D coordinate map and discrete simulated minutes. It is an educational model, not a reconstruction of any commercial delivery platform.

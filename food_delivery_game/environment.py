@@ -22,6 +22,8 @@ class StepResult:
 class DeliveryEnvironment:
     """Simulate orders and drivers for a fixed three-minute episode."""
 
+    DELIVERY_REWARD_POINTS = 10.0
+
     def __init__(self, config: SimulationConfig | None = None) -> None:
         self.config = config or SimulationConfig()
         self.reset()
@@ -32,6 +34,7 @@ class DeliveryEnvironment:
         self.next_order_id = 1
         self.orders: list[Order] = []
         self.total_travel_distance = 0.0
+        self.total_reward = 0.0
         self.restaurants = [
             Restaurant(i, self._random_point()) for i in range(self.config.restaurant_count)
         ]
@@ -71,7 +74,8 @@ class DeliveryEnvironment:
                     raise ValueError(f"{policy.name} selected an invalid assignment: {assignment}")
         delivered_before = len(self.delivered_orders)
         self._advance_drivers()
-        reward = float(len(self.delivered_orders) - delivered_before)
+        reward = self.DELIVERY_REWARD_POINTS * (len(self.delivered_orders) - delivered_before)
+        self.total_reward += reward
         return StepResult(self.time, self.done, reward, len(self.delivered_orders), len(self.pending_orders))
 
     def state_summary(self) -> dict[str, int | float | bool]:
@@ -86,6 +90,7 @@ class DeliveryEnvironment:
             "delivered": len(self.delivered_orders),
             "available_drivers": sum(d.status == DriverStatus.AVAILABLE for d in self.drivers),
             "total_travel_distance": self.total_travel_distance,
+            "total_reward": self.total_reward,
         }
 
     def assign_order(self, driver_id: int, order_id: int) -> bool:
@@ -137,6 +142,11 @@ class DeliveryEnvironment:
             driver.remaining_distance -= distance_travelled
             self.total_travel_distance += distance_travelled
             if driver.remaining_distance > 0:
+                fraction = distance_travelled / distance_to_destination
+                driver.location = Point(
+                    driver.location.x + (driver.destination.x - driver.location.x) * fraction,
+                    driver.location.y + (driver.destination.y - driver.location.y) * fraction,
+                )
                 continue
             driver.location = driver.destination
             order = next((o for o in self.orders if o.order_id == driver.order_id), None)

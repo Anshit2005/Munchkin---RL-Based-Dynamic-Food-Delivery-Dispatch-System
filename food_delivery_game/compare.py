@@ -24,10 +24,10 @@ def main() -> None:
     )
     results = compare_policies(config, episodes=args.episodes)
     print(f"Matched comparison: {args.episodes} episodes per policy, 3 simulated minutes each")
-    print(f"{'Strategy':38} {'Delivered':>10} {'Avg delivery (min)':>20} {'Travel distance':>18}")
+    print(f"{'Strategy':38} {'Delivered':>10} {'Reward (pts)':>14} {'Avg delivery (min)':>20} {'Travel distance':>18}")
     for name in POLICIES:
-        delivered, avg_time, distance = average_metrics(results[name])
-        print(f"{name:38} {delivered:10.2f} {avg_time:20.2f} {distance:18.2f}")
+        delivered, reward, avg_time, distance = average_metrics(results[name])
+        print(f"{name:38} {delivered:10.2f} {reward:14.1f} {avg_time:20.2f} {distance:18.2f}")
 
 
 if __name__ == "__main__":
