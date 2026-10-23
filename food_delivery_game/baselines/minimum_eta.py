@@ -22,4 +22,5 @@ class MinimumETAPolicy:
             ((d, o) for d in available for o in ready),
             key=lambda pair: (estimated_minutes(pair), pair[1].order_id, pair[0].driver_id),
         )
-        return Assignment(driver.driver_id, order.order_id)
+        eta = estimated_minutes((driver, order))
+        return Assignment(driver.driver_id, order.order_id, f"Lowest estimated delivery time: {eta:.2f} min")

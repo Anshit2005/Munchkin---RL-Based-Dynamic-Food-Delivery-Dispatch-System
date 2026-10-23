@@ -31,5 +31,5 @@ class SimulationConfig:
             raise ValueError("Preparation time cannot be negative.")
         if self.preparation_max_minutes < self.preparation_min_minutes:
             raise ValueError("Maximum preparation time must be >= minimum.")
-        if self.episode_minutes != 3:
-            raise ValueError("The project protocol fixes each episode at 3 simulated minutes.")
+        if self.episode_minutes < 1:
+            raise ValueError("An episode must last at least one simulated minute.")

@@ -16,4 +16,10 @@ class OldestOrderPolicy:
             available,
             key=lambda d: (d.location.distance_to(order.restaurant_location), d.driver_id),
         )
-        return Assignment(driver.driver_id, order.order_id)
+        waiting = env.time - order.created_at
+        distance = driver.location.distance_to(order.restaurant_location)
+        return Assignment(
+            driver.driver_id,
+            order.order_id,
+            f"Oldest ready order (waiting {waiting} min); nearest free driver ({distance:.1f} units)",
+        )

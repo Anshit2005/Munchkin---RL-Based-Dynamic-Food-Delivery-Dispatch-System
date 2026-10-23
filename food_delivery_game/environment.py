@@ -19,8 +19,17 @@ class StepResult:
     pending_count: int
 
 
+@dataclass(frozen=True)
+class DispatchEvent:
+    time: int
+    strategy: str
+    driver_id: int
+    order_id: int
+    explanation: str
+
+
 class DeliveryEnvironment:
-    """Simulate orders and drivers for a fixed three-minute episode."""
+    """Simulate orders and drivers for the configured episode horizon."""
 
     DELIVERY_REWARD_POINTS = 10.0
 
@@ -33,6 +42,7 @@ class DeliveryEnvironment:
         self.time = 0
         self.next_order_id = 1
         self.orders: list[Order] = []
+        self.dispatch_log: list[DispatchEvent] = []
         self.total_travel_distance = 0.0
         self.total_reward = 0.0
         self.restaurants = [
@@ -60,7 +70,6 @@ class DeliveryEnvironment:
         if self.done:
             return StepResult(self.time, True, 0.0, len(self.delivered_orders), len(self.pending_orders))
 
-        self.time += 1
         self._generate_orders()
         for order in self.orders:
             if order.status == OrderStatus.PREPARING and order.ready_at <= self.time:
@@ -72,8 +81,16 @@ class DeliveryEnvironment:
                     break
                 if not self.assign_order(assignment.driver_id, assignment.order_id):
                     raise ValueError(f"{policy.name} selected an invalid assignment: {assignment}")
+                self.dispatch_log.append(DispatchEvent(
+                    time=self.time,
+                    strategy=policy.name,
+                    driver_id=assignment.driver_id,
+                    order_id=assignment.order_id,
+                    explanation=assignment.explanation,
+                ))
         delivered_before = len(self.delivered_orders)
         self._advance_drivers()
+        self.time += 1
         reward = self.DELIVERY_REWARD_POINTS * (len(self.delivered_orders) - delivered_before)
         self.total_reward += reward
         return StepResult(self.time, self.done, reward, len(self.delivered_orders), len(self.pending_orders))
@@ -137,34 +154,40 @@ class DeliveryEnvironment:
         for driver in self.drivers:
             if driver.status == DriverStatus.AVAILABLE or driver.destination is None:
                 continue
-            distance_to_destination = driver.remaining_distance
-            distance_travelled = min(self.config.travel_speed, distance_to_destination)
-            driver.remaining_distance -= distance_travelled
-            self.total_travel_distance += distance_travelled
-            if driver.remaining_distance > 0:
-                fraction = distance_travelled / distance_to_destination
-                driver.location = Point(
-                    driver.location.x + (driver.destination.x - driver.location.x) * fraction,
-                    driver.location.y + (driver.destination.y - driver.location.y) * fraction,
-                )
-                continue
-            driver.location = driver.destination
-            order = next((o for o in self.orders if o.order_id == driver.order_id), None)
-            if order is None:
-                self._release_driver(driver)
-            elif driver.status == DriverStatus.TO_RESTAURANT:
-                order.status = OrderStatus.TO_CUSTOMER
-                driver.status = DriverStatus.TO_CUSTOMER
-                driver.destination = order.customer_location
-                driver.remaining_distance = order.restaurant_location.distance_to(order.customer_location)
-                if driver.remaining_distance <= 0:
+            travel_budget = self.config.travel_speed
+            while travel_budget > 0 and driver.status != DriverStatus.AVAILABLE:
+                if driver.destination is None:
+                    break
+                distance_to_destination = driver.remaining_distance
+                distance_travelled = min(travel_budget, distance_to_destination)
+                self.total_travel_distance += distance_travelled
+                travel_budget -= distance_travelled
+                if distance_travelled < distance_to_destination:
+                    fraction = distance_travelled / distance_to_destination
+                    driver.location = Point(
+                        driver.location.x + (driver.destination.x - driver.location.x) * fraction,
+                        driver.location.y + (driver.destination.y - driver.location.y) * fraction,
+                    )
+                    driver.remaining_distance -= distance_travelled
+                    break
+
+                driver.location = driver.destination
+                order = next((o for o in self.orders if o.order_id == driver.order_id), None)
+                if order is None:
+                    self._release_driver(driver)
+                elif driver.status == DriverStatus.TO_RESTAURANT:
+                    order.status = OrderStatus.TO_CUSTOMER
+                    driver.status = DriverStatus.TO_CUSTOMER
+                    driver.destination = order.customer_location
+                    driver.remaining_distance = order.restaurant_location.distance_to(order.customer_location)
+                    if driver.remaining_distance <= 0:
+                        self._deliver(order, driver)
+                else:
                     self._deliver(order, driver)
-            else:
-                self._deliver(order, driver)
 
     def _deliver(self, order: Order, driver: Driver) -> None:
         order.status = OrderStatus.DELIVERED
-        order.delivered_at = self.time
+        order.delivered_at = self.time + 1
         self._release_driver(driver)
 
     @staticmethod

@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 class Assignment:
     driver_id: int
     order_id: int
+    explanation: str
 
 
 class DispatchPolicy(Protocol):
