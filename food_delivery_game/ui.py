@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import ttk
+from tkinter import messagebox, ttk
 
+from .baselines import POLICIES, create_policy
 from .config import SimulationConfig
 from .environment import DeliveryEnvironment
 from .entities import DriverStatus, OrderStatus
+from .simulation.runner import average_metrics, compare_policies
 
 
 class DeliveryGame:
@@ -30,15 +32,19 @@ class DeliveryGame:
         self.restaurant_count = self._add_scale(panel, "Restaurants", 1, 10, 5)
         self.driver_count = self._add_scale(panel, "Delivery partners", 1, 16, 8)
         self.order_rate = self._add_scale(panel, "Orders per minute", 0, 12, 5, resolution=1)
-        self.travel_speed = self._add_scale(panel, "Travel speed", 8, 60, 24)
+        self.travel_speed = self._add_scale(panel, "Travel speed", 8, 60, 60)
         ttk.Label(panel, text="Episode length: fixed at 3 simulated minutes").pack(anchor="w", pady=(8, 12))
+        ttk.Label(panel, text="Dispatch strategy").pack(anchor="w")
+        self.policy_selector = ttk.Combobox(panel, values=list(POLICIES), state="readonly", width=31)
+        self.policy_selector.current(0)
+        self.policy_selector.pack(anchor="w", pady=(3, 8))
         ttk.Button(panel, text="Reset scenario", command=self.reset_simulation).pack(fill=tk.X, pady=3)
         self.run_button = ttk.Button(panel, text="Start", command=self.toggle_run)
         self.run_button.pack(fill=tk.X, pady=3)
         ttk.Button(panel, text="Step 1 minute", command=self.step_once).pack(fill=tk.X, pady=3)
+        ttk.Button(panel, text="Compare all baselines", command=self.show_comparison).pack(fill=tk.X, pady=3)
         ttk.Separator(panel).pack(fill=tk.X, pady=12)
-        ttk.Label(panel, text="Dispatch policy: setup rule", font=("TkDefaultFont", 10, "bold")).pack(anchor="w")
-        ttk.Label(panel, text="Baselines and PPO are added in later stages.", wraplength=205).pack(anchor="w", pady=(4, 0))
+        ttk.Label(panel, text="PPO will be added in a later stage.", wraplength=205).pack(anchor="w", pady=(4, 0))
 
     def _add_scale(self, parent: ttk.Frame, label: str, low: int, high: int, initial: int, resolution: int = 1) -> tk.Scale:
         ttk.Label(parent, text=label).pack(anchor="w")
@@ -75,6 +81,20 @@ class DeliveryGame:
         self.env = DeliveryEnvironment(self._make_config())
         self._draw()
 
+    def _selected_policy(self):
+        return create_policy(self.policy_selector.get())
+
+    def show_comparison(self) -> None:
+        self._stop_timer()
+        self.running = False
+        self.run_button.configure(text="Start")
+        results = compare_policies(self._make_config(), episodes=20)
+        lines = ["Matched comparison over 20 seeds (3 simulated minutes per episode):", ""]
+        for name, episodes in results.items():
+            delivered, avg_time, distance = average_metrics(episodes)
+            lines.append(f"{name}\n  Delivered: {delivered:.2f}   Avg delivery: {avg_time:.2f} min   Travel: {distance:.1f}")
+        messagebox.showinfo("Baseline comparison", "\n".join(lines), parent=self.root)
+
     def toggle_run(self) -> None:
         if self.env.done:
             self.reset_simulation()
@@ -88,7 +108,7 @@ class DeliveryGame:
         self.running = False
         self.run_button.configure(text="Start")
         if not self.env.done:
-            self.env.step()
+            self.env.step(self._selected_policy())
         self._draw()
 
     def _schedule_step(self) -> None:
@@ -98,7 +118,7 @@ class DeliveryGame:
     def _advance(self) -> None:
         self._after_id = None
         if self.running and not self.env.done:
-            self.env.step()
+            self.env.step(self._selected_policy())
             self._draw()
         if self.env.done:
             self.running = False

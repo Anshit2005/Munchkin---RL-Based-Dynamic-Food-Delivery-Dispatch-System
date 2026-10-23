@@ -1,9 +1,4 @@
-"""A small discrete-time food-delivery simulation.
-
-The environment deliberately exposes reset/step/state methods that can later be
-used by baseline policies and RL agents. The temporary built-in dispatch rule
-only keeps the first version of the game runnable; it is not an evaluated model.
-"""
+"""A small discrete-time food-delivery simulation."""
 
 from __future__ import annotations
 
@@ -12,6 +7,7 @@ from dataclasses import dataclass
 
 from .config import SimulationConfig
 from .entities import Driver, DriverStatus, Order, OrderStatus, Point, Restaurant
+from .baselines.base import DispatchPolicy
 
 
 @dataclass(frozen=True)
@@ -35,6 +31,7 @@ class DeliveryEnvironment:
         self.time = 0
         self.next_order_id = 1
         self.orders: list[Order] = []
+        self.total_travel_distance = 0.0
         self.restaurants = [
             Restaurant(i, self._random_point()) for i in range(self.config.restaurant_count)
         ]
@@ -55,7 +52,7 @@ class DeliveryEnvironment:
     def pending_orders(self) -> list[Order]:
         return [o for o in self.orders if o.status != OrderStatus.DELIVERED]
 
-    def step(self) -> StepResult:
+    def step(self, policy: DispatchPolicy | None = None) -> StepResult:
         """Advance one simulated minute and return a small reward and summary."""
         if self.done:
             return StepResult(self.time, True, 0.0, len(self.delivered_orders), len(self.pending_orders))
@@ -65,7 +62,13 @@ class DeliveryEnvironment:
         for order in self.orders:
             if order.status == OrderStatus.PREPARING and order.ready_at <= self.time:
                 order.status = OrderStatus.READY
-        self._dispatch_ready_orders()
+        if policy is not None:
+            while True:
+                assignment = policy.select_assignment(self)
+                if assignment is None:
+                    break
+                if not self.assign_order(assignment.driver_id, assignment.order_id):
+                    raise ValueError(f"{policy.name} selected an invalid assignment: {assignment}")
         delivered_before = len(self.delivered_orders)
         self._advance_drivers()
         reward = float(len(self.delivered_orders) - delivered_before)
@@ -82,7 +85,25 @@ class DeliveryEnvironment:
             "in_transit": sum(o.status in (OrderStatus.TO_RESTAURANT, OrderStatus.TO_CUSTOMER) for o in self.orders),
             "delivered": len(self.delivered_orders),
             "available_drivers": sum(d.status == DriverStatus.AVAILABLE for d in self.drivers),
+            "total_travel_distance": self.total_travel_distance,
         }
+
+    def assign_order(self, driver_id: int, order_id: int) -> bool:
+        """Assign a ready order to an available driver; return False if invalid."""
+        driver = next((d for d in self.drivers if d.driver_id == driver_id), None)
+        order = next((o for o in self.orders if o.order_id == order_id), None)
+        if driver is None or order is None:
+            return False
+        if driver.status != DriverStatus.AVAILABLE or order.status != OrderStatus.READY:
+            return False
+
+        order.assigned_driver_id = driver.driver_id
+        order.status = OrderStatus.TO_RESTAURANT
+        driver.order_id = order.order_id
+        driver.status = DriverStatus.TO_RESTAURANT
+        driver.destination = order.restaurant_location
+        driver.remaining_distance = driver.location.distance_to(order.restaurant_location)
+        return True
 
     def _random_point(self) -> Point:
         return Point(self.rng.uniform(3, self.config.width - 3), self.rng.uniform(3, self.config.height - 3))
@@ -107,27 +128,14 @@ class DeliveryEnvironment:
             ))
             self.next_order_id += 1
 
-    def _dispatch_ready_orders(self) -> None:
-        # Temporary deterministic setup rule: oldest ready order to nearest free driver.
-        available = [d for d in self.drivers if d.status == DriverStatus.AVAILABLE]
-        ready = sorted((o for o in self.orders if o.status == OrderStatus.READY), key=lambda o: o.created_at)
-        for order in ready:
-            if not available:
-                break
-            driver = min(available, key=lambda d: d.location.distance_to(order.restaurant_location))
-            available.remove(driver)
-            order.assigned_driver_id = driver.driver_id
-            order.status = OrderStatus.TO_RESTAURANT
-            driver.order_id = order.order_id
-            driver.status = DriverStatus.TO_RESTAURANT
-            driver.destination = order.restaurant_location
-            driver.remaining_distance = driver.location.distance_to(order.restaurant_location)
-
     def _advance_drivers(self) -> None:
         for driver in self.drivers:
             if driver.status == DriverStatus.AVAILABLE or driver.destination is None:
                 continue
-            driver.remaining_distance -= self.config.travel_speed
+            distance_to_destination = driver.remaining_distance
+            distance_travelled = min(self.config.travel_speed, distance_to_destination)
+            driver.remaining_distance -= distance_travelled
+            self.total_travel_distance += distance_travelled
             if driver.remaining_distance > 0:
                 continue
             driver.location = driver.destination

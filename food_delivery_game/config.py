@@ -10,9 +10,9 @@ class SimulationConfig:
     restaurant_count: int = 5
     driver_count: int = 8
     orders_per_minute: float = 5.0
-    travel_speed: float = 24.0
-    preparation_min_minutes: int = 1
-    preparation_max_minutes: int = 3
+    travel_speed: float = 60.0
+    preparation_min_minutes: int = 0
+    preparation_max_minutes: int = 1
     episode_minutes: int = 3
     seed: int = 7
 

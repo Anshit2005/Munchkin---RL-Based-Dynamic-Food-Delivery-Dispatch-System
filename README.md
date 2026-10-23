@@ -1,6 +1,6 @@
 # Munchkin - RL Based Dynamic Food Delivery Dispatch System
 
-Munchkin is a configurable food-delivery dispatch simulator for studying sequential dispatch decisions with reinforcement learning. This initial version contains the simulation environment and a Tkinter game interface. The explicit heuristic baselines and PPO agent will be added in later commits.
+Munchkin is a configurable food-delivery dispatch simulator for studying sequential dispatch decisions with reinforcement learning. The simulator currently includes three heuristic dispatch baselines and a Tkinter game interface. PPO will be added in a later commit.
 
 ## Requirements
 
@@ -19,19 +19,32 @@ python3 -m food_delivery_game
 
 Use **Start / Pause** to advance the simulation and **Reset** to start a new scenario. Configure restaurants, drivers, order arrival rate, and travel speed before starting. Episodes run for a fixed three simulated minutes.
 
+## Compare the baselines
+
+Run matched episodes for all three strategies from the project root:
+
+```bash
+python3 -m food_delivery_game.compare --episodes 20
+```
+
+Every strategy receives the same seed for each comparison episode. You can also pass `--seed`, `--drivers`, `--restaurants`, or `--orders-per-minute` to change the experiment setup.
+
 ## Project layout
 
 ```text
 food_delivery_game/
+  baselines/        Three heuristic dispatch policies
   __main__.py       Tkinter entry point
+  compare.py        Command-line baseline comparison
   config.py         Simulation configuration
   entities.py       Restaurant, driver, and order data models
   environment.py    Discrete-time delivery simulation
+  simulation/       Matched episode runner and metrics
   ui.py             Map, controls, and live status display
 ```
 
-## Initial version scope
+## Current scope
 
-The environment supports order arrivals, preparation, driver dispatch, travel, pickups, deliveries, and basic episode metrics. A simple built-in setup rule keeps this version runnable; it is environment plumbing, not one of the planned evaluated baselines. Later work will add the three explicit baselines and then PPO, with common episode seeds and metrics for comparison.
+The environment supports order arrivals, preparation, driver dispatch, travel, pickups, and deliveries. The three baselines are nearest driver, oldest/most urgent ready order, and minimum estimated delivery time. The comparison runner reports average deliveries, delivery time, and travel distance over matched episode seeds. The GUI lets you run a selected baseline or compare all three. PPO is planned for a later commit.
 
 The current simulator uses a lightweight 2D coordinate map and discrete simulated minutes. It is an educational model, not a reconstruction of any commercial delivery platform.
