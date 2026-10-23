@@ -17,11 +17,11 @@ From the project root:
 python3 -m food_delivery_game
 ```
 
-When the game opens, enter both player names. Each player then chooses a strategy. Set the shared restaurant count, driver count, and order arrival rate in the controls below the two maps. Press **Start match** to begin, or use **Step one game minute** to advance both players together.
+When the game opens, enter both player names. Each player then chooses a strategy. Set the shared restaurant count, driver count, and order arrival rate in the controls below the two maps. Press **Start match** to begin, or use **Step one game minute** to advance the active player's simulation.
 
 ## Game rules and assumptions
 
-- A match lasts 60 simulated minutes. Automatic play advances one game minute every real second, so a complete match takes about one minute. Pausing stops both simulations together.
+- Each player receives a separate 60-simulated-minute run. Player 1 runs first, then Player 2; automatic play advances one game minute every real second, so a full match takes about two minutes. The active player's clock and map update while the other player's finished or waiting state remains visible. Pausing stops the active run.
 - Each player gets a separate copy of the same scenario: same map, restaurant and driver positions, order arrivals, preparation times, and random seed. Only the dispatch strategy differs.
 - Orders arrive at the start of each simulated minute at the shared configured rate. Their restaurant, customer location, and preparation time are generated from the match seed.
 - Food preparation takes 0 or 1 game minute in this prototype. The travel rate is a fixed internal setting shared by both players.

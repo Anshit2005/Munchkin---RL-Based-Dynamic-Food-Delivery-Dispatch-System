@@ -146,7 +146,7 @@ class DeliveryGame:
 
         progress_row = tk.Frame(center, bg=self.COLORS["background"])
         progress_row.pack(fill=tk.X, pady=(7, 2))
-        tk.Label(progress_row, text="MATCH CLOCK", bg=self.COLORS["background"], fg=self.COLORS["muted"], font=("TkDefaultFont", 8, "bold")).pack(side=tk.LEFT)
+        tk.Label(progress_row, text="ACTIVE PLAYER CLOCK", bg=self.COLORS["background"], fg=self.COLORS["muted"], font=("TkDefaultFont", 8, "bold")).pack(side=tk.LEFT)
         self.clock_label = tk.Label(progress_row, text="00:00 / 60:00", bg=self.COLORS["background"], fg=self.COLORS["cyan"], font=("TkDefaultFont", 9, "bold"))
         self.clock_label.pack(side=tk.RIGHT)
         self.progress = tk.Canvas(center, height=14, bg="#17263d", highlightthickness=0)
@@ -219,6 +219,7 @@ class DeliveryGame:
         self.running = False
         self.match_started = False
         self.match_complete = False
+        self.active_player_index = 0
         self._summary_shown = False
         self._progress_fraction = 0.0
         self._feed_prompt_shown = True
@@ -251,7 +252,7 @@ class DeliveryGame:
         self._set_locked(True)
         if self.running:
             self.start_button.configure(text="Ⅱ  Pause match")
-            self._set_activity("● LIVE DUEL", self.COLORS["green"])
+            self._set_activity(f"● PLAYER {self.active_player_index + 1} LIVE", self.player_colors[self.active_player_index])
             self._schedule_minute()
         else:
             self.start_button.configure(text="▶  Resume match")
@@ -270,7 +271,7 @@ class DeliveryGame:
         self.match_started = True
         self._set_locked(True)
         self._progress_fraction = 0.0
-        self._step_both()
+        self._step_active_player()
 
     def _schedule_minute(self) -> None:
         if not self.running:
@@ -300,7 +301,7 @@ class DeliveryGame:
         if not self.running:
             return
         self._progress_fraction = 0.0
-        self._step_both()
+        self._step_active_player()
         if self.match_complete:
             self.running = False
             self.start_button.configure(text="▶  Start next match")
@@ -309,15 +310,22 @@ class DeliveryGame:
         else:
             self._schedule_minute()
 
-    def _step_both(self) -> None:
-        old_delivered = [len(env.delivered_orders) for env in self.envs]
-        for env, policy in zip(self.envs, self.policies):
-            env.step(policy)
+    def _step_active_player(self) -> None:
+        player_index = self.active_player_index
+        env = self.envs[player_index]
+        old_delivered = len(env.delivered_orders)
+        env.step(self.policies[player_index])
         self._draw_all()
         self._append_new_decisions()
-        if any(len(env.delivered_orders) > old for env, old in zip(self.envs, old_delivered)):
+        if len(env.delivered_orders) > old_delivered:
             self._play_sound()
-        if all(env.done for env in self.envs):
+
+        if env.done and player_index == 0:
+            self.active_player_index = 1
+            self._progress_fraction = 0.0
+            self._set_activity("● PLAYER 2 UP NEXT", self.player_colors[1])
+            self._update_progress()
+        elif env.done:
             self.match_complete = True
             self.running = False
             self._set_activity("★ MATCH COMPLETE", self.COLORS["yellow"])
@@ -326,9 +334,9 @@ class DeliveryGame:
             self.start_button.configure(text="▶  Start next match")
             self._show_results()
         elif self.running:
-            self._set_activity("● LIVE DUEL", self.COLORS["green"])
+            self._set_activity(f"● PLAYER {player_index + 1} LIVE", self.player_colors[player_index])
         else:
-            self._set_activity("● READY FOR NEXT MINUTE", self.COLORS["cyan"])
+            self._set_activity(f"● PLAYER {self.active_player_index + 1} READY FOR NEXT MINUTE", self.player_colors[self.active_player_index])
 
     def _append_new_decisions(self) -> None:
         self.decision_feed.configure(state=tk.NORMAL)
@@ -358,7 +366,8 @@ class DeliveryGame:
         if line_count > 28:
             self.decision_feed.delete("1.0", f"{line_count - 28}.0")
         if added_events == 0:
-            self.decision_feed.insert(tk.END, f"{max(0, self.envs[0].time - 1):02d}:00  No assignment: no ready orders or all drivers are busy.\n")
+            active_env = self.envs[self.active_player_index]
+            self.decision_feed.insert(tk.END, f"{max(0, active_env.time - 1):02d}:00  No assignment: no ready orders or all drivers are busy.\n")
         self.decision_feed.configure(state=tk.DISABLED)
         self.decision_feed.see(tk.END)
 
@@ -442,7 +451,8 @@ class DeliveryGame:
         self.progress.delete("all")
         width = max(self.progress.winfo_width(), 1)
         height = self.progress.winfo_height()
-        elapsed = self.envs[0].time + (self._progress_fraction if self.running else 0.0)
+        active_env = self.envs[self.active_player_index]
+        elapsed = active_env.time + (self._progress_fraction if self.running else 0.0)
         fraction = min(elapsed / self.MATCH_MINUTES, 1.0)
         self.progress.create_rectangle(0, 0, width, height, fill="#17263d", outline="")
         if fraction:
@@ -450,7 +460,7 @@ class DeliveryGame:
             self.progress.create_oval(max(1, width * fraction - 5), 2, width * fraction + 5, height - 2, fill="#e0fbff", outline="")
         elapsed_seconds = min(round(elapsed * 60), self.MATCH_MINUTES * 60)
         hours, rem = divmod(elapsed_seconds, 60)
-        self.clock_label.configure(text=f"{hours:02d}:{rem:02d} / 60:00")
+        self.clock_label.configure(text=f"P{self.active_player_index + 1} · {hours:02d}:{rem:02d} / 60:00")
 
     def _results_for(self, env: DeliveryEnvironment) -> dict[str, float | int]:
         delivered = env.delivered_orders
