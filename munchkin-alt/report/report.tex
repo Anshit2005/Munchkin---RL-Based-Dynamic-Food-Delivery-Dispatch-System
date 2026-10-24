@@ -1,0 +1,71 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx,booktabs,amsmath,float,hyperref,caption}
+\graphicspath{{../results/plots/}}
+\title{Reinforcement Learning for Dynamic Food Delivery Dispatch\\\large Implementation and Experimental Report}
+\author{Anshit Agarwal \and Namya Dhingra}
+\date{October 2026}
+
+\begin{document}
+\maketitle
+
+\section{Problem and approach}
+A central dispatcher must decide, at every moment, which delivery partner serves which order and
+whether to wait. We formulate this as an MDP $(S,A,P,R,\gamma)$ over a 10$\times$10 city grid and
+compare three heuristics (nearest driver, most urgent order, minimum estimated delivery time) with
+two learned policies (DQN, PPO) \emph{in the same simulator, on the same seeds}. Every episode lasts
+exactly $T=3$ simulated minutes (180 one-second ticks), independent of the configuration or the
+algorithm.
+
+\section{Environment and MDP}
+\paragraph{Simulator.} Restaurants, customers, drivers and orders live on a continuous grid with Manhattan
+travel (L-shaped routes). Orders arrive by a Poisson process (plus a small backlog at $t=0$), have a hidden
+true and an observable estimated preparation time, and a deadline. Order lifecycle:
+Created $\to$ Preparing $\to$ Ready $\to$ Assigned $\to$ Picked up $\to$ Delivered; a driver can be
+assigned while food is still being prepared and then waits at the restaurant. All randomness is
+pre-sampled from the seed into a scenario trace so that every strategy faces an identical world.
+
+\paragraph{State.} A fixed 481-dimensional vector: 12 driver slots (position, availability, load, status,
+time until free), 16 order slots (restaurant/customer position, age, estimated prep remaining, ready flag,
+time to deadline, restaurant load), 12$\times$16 estimated completion times for each valid driver--order pair,
+and 9 global features. Hidden quantities are never exposed.
+
+\paragraph{Actions.} $\text{assign}(d_i,o_j)$ for $12\times16$ slots plus $\text{wait}$ (193 actions), with an
+action mask; invalid actions are treated as waiting and penalised.
+
+\paragraph{Reward.}
+\[
+R_t = w_1 D_t - w_2 W_t - w_3 L_t - w_4 T_t + w_5 B_t - w_6 I_t,
+\]
+with deliveries $D_t$, order-minutes waiting $W_t$, order-minutes overdue $L_t$, distance $T_t$, batching
+savings $B_t$ and idle-driver-minutes $I_t$, plus a penalty for each order undelivered at $t=180$. The weights
+(10, 2, 4, 0.1, 0.5, 1; undelivered 5) were fixed before the final evaluation.
+
+\section{Methods}
+\textbf{Baselines.} B1 serves the oldest order with the nearest driver; B2 serves the order with the least
+slack to its deadline with the nearest feasible driver; B3 greedily picks the feasible (driver, order) pair
+with the smallest estimated delivery time.
+
+\textbf{DQN.} Double DQN with action masking, uniform replay, a hard-updated target network,
+$\epsilon$-greedy exploration among valid actions and Huber loss.
+
+\textbf{PPO.} Separate policy and value networks, masked categorical policy, GAE($\lambda{=}0.95$),
+clipped surrogate objective, entropy bonus, parallel rollouts.
+
+Both use a pairwise network that scores each (driver, order) pair with shared weights and a separate head for the wait action.
+
+\section{Experimental protocol}
+Five scenarios (Low/Medium/High demand, Driver shortage/surplus). Training samples random scenarios; model
+selection uses 20 validation episodes; final results use 100 held-out test seeds per scenario (disjoint
+from training and validation seeds). RL results are averaged over three independent training seeds.
+Paired Wilcoxon tests compare each RL agent with each baseline on identical seeds.
+
+\section{Results}
+\input{results_section.tex}
+
+\section{Limitations}
+The simulator is deliberately small: time is compressed so that a delivery takes about a minute, there is
+one pickup per trip unless batching is enabled, travel follows Manhattan paths without road networks, and
+the RL agents were trained without batching.
+
+\end{document}

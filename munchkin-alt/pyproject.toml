@@ -1,0 +1,9 @@
+[project]
+name = "rl-food-delivery-dispatch"
+version = "0.1.0"
+description = "Reinforcement learning for dynamic food delivery dispatch (3-minute simulator)"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

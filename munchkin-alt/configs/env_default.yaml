@@ -1,0 +1,17 @@
+# Default world/physics parameters (episode duration is NOT configurable: fixed 3 simulated minutes).
+n_restaurants: 5
+n_drivers: 8
+orders_per_min: 5.0
+traffic: normal
+batching: false
+base_speed: 0.13
+customer_radius: 4.0
+prep_mean: 30.0
+prep_std: 10.0
+prep_min: 10.0
+prep_max: 60.0
+prep_est_noise: 0.2
+deadline_slack: 35.0
+backlog_frac: 0.5
+traffic_noise: 0.1
+min_restaurant_spacing: 2.0

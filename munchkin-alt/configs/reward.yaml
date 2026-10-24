@@ -1,0 +1,11 @@
+# Reward weights: R = w1*D - w2*W - w3*L - w4*T + w5*B - w6*I (+ terminal / invalid terms).
+# Tuned on validation seeds, then frozen for evaluation.
+w_delivery: 10.0
+w_wait: 2.0
+w_late: 4.0
+w_travel: 0.1
+w_batch: 0.5
+w_idle: 1.0
+undelivered_penalty: 5.0
+invalid_penalty: 1.0
+gamma: 0.99

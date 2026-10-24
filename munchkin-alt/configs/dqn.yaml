@@ -1,0 +1,18 @@
+# Double DQN with action masking.
+arch: pairwise          # pairwise | mlp
+hidden: 128
+gamma: 0.99
+reward_scale: 0.1       # rewards are multiplied by this inside the learner only
+lr: 0.0005
+grad_clip: 10.0
+batch_size: 128
+buffer_size: 60000
+learning_starts: 3000
+train_freq: 4           # one gradient step every N env steps
+target_update: 1000     # hard target-network sync every N env steps
+eps_start: 1.0
+eps_end: 0.05
+eps_decay_frac: 0.4     # fraction of total steps over which epsilon decays linearly
+total_steps: 300000
+val_every: 20000
+val_seeds_per_scenario: 4

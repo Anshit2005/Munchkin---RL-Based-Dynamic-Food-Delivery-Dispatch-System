@@ -1,0 +1,6 @@
+# Spec Table 1. Every scenario still runs for exactly 3 simulated minutes.
+low_demand:      {n_restaurants: 5, n_drivers: 8,  orders_per_min: 2}
+medium_demand:   {n_restaurants: 5, n_drivers: 8,  orders_per_min: 5}
+high_demand:     {n_restaurants: 5, n_drivers: 8,  orders_per_min: 8}
+driver_shortage: {n_restaurants: 5, n_drivers: 4,  orders_per_min: 5}
+driver_surplus:  {n_restaurants: 5, n_drivers: 12, orders_per_min: 5}
