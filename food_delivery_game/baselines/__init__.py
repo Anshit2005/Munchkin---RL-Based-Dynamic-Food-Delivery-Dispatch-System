@@ -14,6 +14,9 @@ POLICIES: dict[str, type[DispatchPolicy]] = {
 
 def create_policy(name: str) -> DispatchPolicy:
     """Create a fresh policy instance by its display name."""
+    if name in ("DQN", "PPO"):
+        from ..rl.policies import create_rl_policy
+        return create_rl_policy(name)
     try:
         return POLICIES[name]()
     except KeyError as exc:

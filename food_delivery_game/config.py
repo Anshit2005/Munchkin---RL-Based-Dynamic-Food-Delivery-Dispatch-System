@@ -1,6 +1,10 @@
 """Configuration for one delivery-simulation episode."""
 
 from dataclasses import dataclass
+from pathlib import Path
+
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 @dataclass(frozen=True)

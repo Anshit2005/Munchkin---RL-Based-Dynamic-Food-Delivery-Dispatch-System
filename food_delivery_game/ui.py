@@ -11,6 +11,7 @@ from .baselines import POLICIES, create_policy
 from .config import SimulationConfig
 from .environment import DeliveryEnvironment
 from .entities import DriverStatus, OrderStatus
+from .rl.registry import available_policies
 
 
 class DeliveryGame:
@@ -38,6 +39,8 @@ class DeliveryGame:
         "Nearest Driver": "Chooses the closest available driver and ready-order pickup pair.",
         "Oldest / Most Urgent": "Serves the ready order that has waited the longest.",
         "Minimum Estimated Delivery Time": "Chooses the pair with the shortest pickup-plus-delivery ETA.",
+        "DQN": "Uses a trained Q-network to choose legal driver/order assignments.",
+        "PPO": "Uses a trained policy network to choose legal driver/order assignments.",
     }
 
     def __init__(self, root: tk.Tk, player1_name: str, player2_name: str) -> None:
@@ -101,7 +104,7 @@ class DeliveryGame:
         tk.Label(panel, text=f"PLAYER {player_index + 1}", bg=self.COLORS["panel"], fg=color, font=("TkDefaultFont", 10, "bold")).pack(anchor="w")
         tk.Label(panel, text=self.player_names[player_index], bg=self.COLORS["panel"], fg=self.COLORS["text"], font=("TkDefaultFont", 17, "bold"), wraplength=215).pack(anchor="w", pady=(2, 10))
         tk.Label(panel, text="STRATEGY", bg=self.COLORS["panel"], fg=self.COLORS["muted"], font=("TkDefaultFont", 8, "bold")).pack(anchor="w")
-        selector = ttk.Combobox(panel, values=list(POLICIES), state="readonly", width=27)
+        selector = ttk.Combobox(panel, values=[*POLICIES, *available_policies()], state="readonly", width=27)
         selector.current(player_index % len(POLICIES))
         selector.pack(fill=tk.X, pady=(3, 5))
         hint = tk.Label(panel, text=self.POLICY_HINTS[selector.get()], bg=self.COLORS["panel"], fg=color, wraplength=215, justify=tk.LEFT, font=("TkDefaultFont", 9))

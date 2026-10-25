@@ -1,13 +1,27 @@
 # Munchkin - RL Based Dynamic Food Delivery Dispatch System
 
-Munchkin is a head-to-head food-delivery dispatch game and a simulator for comparing dispatch strategies. Two players choose policies that run against matching copies of the same simulated city. The current strategies are three heuristic baselines; PPO will be added in a later commit.
+Munchkin is a head-to-head food-delivery dispatch game and a simulator for comparing dispatch strategies. Two players choose policies that run against matching copies of the same simulated city. Available strategies include three heuristic baselines and trained DQN/PPO policies.
 
 ## Requirements
 
 - Python 3.10 or newer
 - Tkinter (usually included with Python; Linux distributions may package it separately)
 
-No third-party Python packages are required for the simulator or interface.
+The simulator and interface use Python's standard library. DQN and PPO training require NumPy and PyTorch.
+
+Install dependencies in a virtual environment. Run the activation command for your shell from the project folder.
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+```
+
+On Windows PowerShell, activate with:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
 
 ## Run
 
@@ -42,6 +56,43 @@ python3 -m food_delivery_game.compare --episodes 20
 
 Every strategy receives the same seed for each three-minute comparison episode. You can also pass `--seed`, `--drivers`, `--restaurants`, or `--orders-per-minute` to change the experiment setup.
 
+## Train DQN and PPO
+
+Both agents use the same simulator as the baselines. At each decision, the agent may assign one
+ready order to an available delivery partner or choose **wait**, which advances the simulated
+minute. Assignments earn no immediate reward; each completed delivery earns 10 points. Training
+randomizes the number of restaurants, delivery partners, and order rate across episodes. The
+observation contains normalized driver state, ready-order details, pairwise estimated travel time,
+and shared scenario settings. Invalid assignments are masked from both algorithms.
+
+Train either agent from the project root:
+
+```bash
+python3 -m food_delivery_game.rl.train --algorithm dqn --episodes 500
+python3 -m food_delivery_game.rl.train --algorithm ppo --episodes 500
+```
+
+Checkpoints are saved as `models/dqn.pt` and `models/ppo.pt`; episode logs are saved alongside
+them. To compare the baselines and any trained RL models on matched seeds:
+
+```bash
+python3 -m food_delivery_game.rl.evaluate --episodes 20 --minutes 60
+```
+
+Print a terminal report for all three baselines plus DQN and PPO across low, medium, and heavy
+demand (five matched episodes per scenario by default):
+
+```bash
+python3 -m food_delivery_game.rl.scenario_report
+```
+
+Change the episode count or shared setup with options such as
+`--episodes 10 --drivers 8 --restaurants 5`.
+
+After training, restart the game. A DQN or PPO strategy appears in the player selector when its
+checkpoint exists. DQN selects its highest-value legal action; PPO samples from its learned
+categorical policy, which is the action-selection method used during PPO training.
+
 ## Project layout
 
 ```text
@@ -53,11 +104,12 @@ food_delivery_game/
   entities.py       Restaurant, driver, and order data models
   environment.py    Discrete-time delivery simulation
   simulation/       Matched episode runner and metrics
+  rl/               DQN/PPO agents, training, and matched-seed evaluation
   ui.py             Map, controls, and live status display
 ```
 
 ## Current scope
 
-The environment supports order arrivals, preparation, driver dispatch, travel, pickups, and deliveries. The three baselines are nearest driver, oldest/most urgent ready order, and minimum estimated delivery time. The comparison runner reports average deliveries, reward points, delivery time, and travel distance over matched episode seeds. The GUI pits two selected baselines against one another. PPO is planned for a later commit.
+The environment supports order arrivals, preparation, driver dispatch, travel, pickups, and deliveries. The three baselines are nearest driver, oldest/most urgent ready order, and minimum estimated delivery time. DQN and PPO use masked pairwise neural policies trained with replay learning and clipped policy optimization, respectively. The comparison runners report deliveries, reward points, delivery time, and travel distance over matched episode seeds. The GUI pits two selected strategies against one another.
 
 The current simulator uses a lightweight 2D coordinate map and discrete simulated minutes. Orders arrive at the start of each minute; deliveries can be completed during that minute using the driver's remaining travel distance after pickup. Orders unfinished at the match cutoff remain pending and are counted in the final statistics. The simulator is an educational model, not a reconstruction of any commercial delivery platform.

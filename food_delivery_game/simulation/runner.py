@@ -19,14 +19,18 @@ class EpisodeMetrics:
 
 def run_episode(strategy: str, config: SimulationConfig, seed: int | None = None) -> EpisodeMetrics:
     """Run one strategy for one fixed-horizon episode."""
+    return run_policy_episode(create_policy(strategy), config, seed)
+
+
+def run_policy_episode(policy, config: SimulationConfig, seed: int | None = None) -> EpisodeMetrics:
+    """Run any policy implementing ``select_assignment`` for one episode."""
     env = DeliveryEnvironment(config)
     env.reset(seed=seed)
-    policy = create_policy(strategy)
     while not env.done:
         env.step(policy)
     delivery_times = [o.delivered_at - o.created_at for o in env.delivered_orders if o.delivered_at is not None]
     return EpisodeMetrics(
-        strategy=strategy,
+        strategy=policy.name,
         seed=config.seed if seed is None else seed,
         delivered=len(env.delivered_orders),
         total_reward=env.total_reward,

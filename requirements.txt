@@ -1,1 +1,2 @@
-# The initial simulator uses only Python's standard library.
+numpy>=1.24
+torch>=2.0

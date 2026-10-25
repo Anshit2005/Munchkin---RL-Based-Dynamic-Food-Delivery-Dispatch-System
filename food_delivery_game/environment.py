@@ -45,6 +45,7 @@ class DeliveryEnvironment:
         self.dispatch_log: list[DispatchEvent] = []
         self.total_travel_distance = 0.0
         self.total_reward = 0.0
+        self._tick_prepared = False
         self.restaurants = [
             Restaurant(i, self._random_point()) for i in range(self.config.restaurant_count)
         ]
@@ -70,10 +71,7 @@ class DeliveryEnvironment:
         if self.done:
             return StepResult(self.time, True, 0.0, len(self.delivered_orders), len(self.pending_orders))
 
-        self._generate_orders()
-        for order in self.orders:
-            if order.status == OrderStatus.PREPARING and order.ready_at <= self.time:
-                order.status = OrderStatus.READY
+        self.prepare_minute()
         if policy is not None:
             while True:
                 assignment = policy.select_assignment(self)
@@ -88,9 +86,29 @@ class DeliveryEnvironment:
                     order_id=assignment.order_id,
                     explanation=assignment.explanation,
                 ))
+        return self.advance_minute()
+
+    def prepare_minute(self) -> None:
+        """Create this minute's orders and mark food ready; safe to call only once per minute."""
+        if self.done:
+            return
+        if self._tick_prepared:
+            return
+        self._generate_orders()
+        for order in self.orders:
+            if order.status == OrderStatus.PREPARING and order.ready_at <= self.time:
+                order.status = OrderStatus.READY
+        self._tick_prepared = True
+
+    def advance_minute(self) -> StepResult:
+        """Move drivers for one minute and advance the episode clock."""
+        if self.done:
+            return StepResult(self.time, True, 0.0, len(self.delivered_orders), len(self.pending_orders))
+        self.prepare_minute()
         delivered_before = len(self.delivered_orders)
         self._advance_drivers()
         self.time += 1
+        self._tick_prepared = False
         reward = self.DELIVERY_REWARD_POINTS * (len(self.delivered_orders) - delivered_before)
         self.total_reward += reward
         return StepResult(self.time, self.done, reward, len(self.delivered_orders), len(self.pending_orders))
