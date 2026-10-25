@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from ..baselines.base import Assignment
 from .registry import MODEL_FILES
-from .state import MAX_ORDERS, WAIT_ACTION, encode_state
+from .state import MAX_ORDERS, N_ACTIONS, OBS_SIZE, OBS_VERSION, WAIT_ACTION, encode_state
 
 
 class RLDispatchPolicy:
@@ -44,8 +44,13 @@ def create_rl_policy(name: str) -> RLDispatchPolicy:
     if not path.is_file():
         raise FileNotFoundError(f"No trained {name} model at {path}. Train it with python -m food_delivery_game.rl.train.")
     checkpoint = torch.load(path, map_location="cpu", weights_only=False)
-    if checkpoint.get("observation_size") != 1832 or checkpoint.get("action_count") != 1025:
+    if checkpoint.get("observation_size") != OBS_SIZE or checkpoint.get("action_count") != N_ACTIONS:
         raise RuntimeError(f"Checkpoint {path} does not match the current Munchkin RL state/action layout")
+    if checkpoint.get("observation_version") != OBS_VERSION:
+        raise RuntimeError(
+            f"Checkpoint {path} uses an older observation layout. Retrain {name} with "
+            f"python3 -m food_delivery_game.rl.train --algorithm {name.lower()} --episodes 500"
+        )
     algorithm = checkpoint["algorithm"]
     cfg = checkpoint["agent_config"]
     if algorithm == "DQN":

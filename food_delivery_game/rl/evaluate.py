@@ -52,7 +52,8 @@ def main():
     args = parser.parse_args()
     results = evaluate(args.episodes, args.minutes, args.seed, args.drivers,
                        args.restaurants, args.orders_per_minute)
-    fields = ("strategy", "episodes", "mean_delivered", "mean_reward", "mean_delivery_minutes", "mean_travel_distance")
+    fields = ("strategy", "episodes", "mean_delivered", "mean_game_points", "mean_rl_reward",
+              "mean_delivery_minutes", "mean_travel_distance")
     rows = []
     for name, episodes in results.items():
         delivery_times = [item.average_delivery_time for item in episodes if item.delivered]
@@ -60,7 +61,8 @@ def main():
             "strategy": name,
             "episodes": len(episodes),
             "mean_delivered": sum(item.delivered for item in episodes) / len(episodes),
-            "mean_reward": sum(item.total_reward for item in episodes) / len(episodes),
+            "mean_game_points": sum(item.total_reward for item in episodes) / len(episodes),
+            "mean_rl_reward": sum(item.total_training_reward for item in episodes) / len(episodes),
             "mean_delivery_minutes": sum(delivery_times) / len(delivery_times) if delivery_times else math.nan,
             "mean_travel_distance": sum(item.total_travel_distance for item in episodes) / len(episodes),
         })
@@ -70,11 +72,13 @@ def main():
         writer = csv.DictWriter(file, fieldnames=fields)
         writer.writeheader()
         writer.writerows(rows)
-    print(f"{'Strategy':38} {'Delivered':>10} {'Reward':>10} {'Avg delivery (min)':>20} {'Travel':>12}")
+    print(f"{'Strategy':38} {'Delivered':>10} {'Game pts':>10} {'RL reward':>11} "
+          f"{'Avg delivery (min)':>20} {'Travel':>12}")
     for row in rows:
         avg = row["mean_delivery_minutes"]
         avg_text = f"{avg:.2f}" if math.isfinite(avg) else "n/a"
-        print(f"{row['strategy']:38} {row['mean_delivered']:10.2f} {row['mean_reward']:10.1f} "
+        print(f"{row['strategy']:38} {row['mean_delivered']:10.2f} "
+              f"{row['mean_game_points']:10.1f} {row['mean_rl_reward']:11.1f} "
               f"{avg_text:>20} {row['mean_travel_distance']:12.1f}")
     print(f"Saved matched-seed results to {out}")
 

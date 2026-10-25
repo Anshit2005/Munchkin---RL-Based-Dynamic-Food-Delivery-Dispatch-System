@@ -9,9 +9,8 @@ from ..environment import DeliveryEnvironment
 class RLDeliveryEnvironment:
     """One assignment or one minute of simulated time is a single RL transition.
 
-    Assignment actions have zero immediate reward. WAIT advances the simulator by one minute
-    and returns its delivery reward. This lets the agent dispatch several drivers during the
-    same minute, matching the heuristic policy interface.
+    An assignment may reserve a preparing or ready order. WAIT advances the simulator by one
+    minute and returns the multi-objective reward, allowing several dispatch decisions per minute.
     """
 
     def __init__(self, config=None):
@@ -56,7 +55,11 @@ class RLDeliveryEnvironment:
         else:
             raise ValueError(f"invalid or masked action: {action}")
         observation, mask, orders = self._refresh() if not done else (self._observation, self._mask, self._orders)
-        return observation, reward, done, {"action_mask": mask, "ready_orders": len(orders)}
+        return observation, reward, done, {
+            "action_mask": mask,
+            "ready_orders": len(orders),
+            "score_reward": result.score_reward if action == WAIT_ACTION else 0.0,
+        }
 
     def _refresh(self):
         self._observation, self._mask, self._orders = encode_state(self.sim)

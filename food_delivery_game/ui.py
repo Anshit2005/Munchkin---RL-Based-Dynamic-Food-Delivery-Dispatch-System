@@ -36,9 +36,9 @@ class DeliveryGame:
     }
 
     POLICY_HINTS = {
-        "Nearest Driver": "Chooses the closest available driver and ready-order pickup pair.",
-        "Oldest / Most Urgent": "Serves the ready order that has waited the longest.",
-        "Minimum Estimated Delivery Time": "Chooses the pair with the shortest pickup-plus-delivery ETA.",
+        "Nearest Driver": "Chooses the closest available driver and dispatchable-order pickup pair.",
+        "Oldest / Most Urgent": "Chooses the order with the least estimated time left before its deadline.",
+        "Minimum Estimated Delivery Time": "Chooses the pair with the shortest estimated completion time, including prep.",
         "DQN": "Uses a trained Q-network to choose legal driver/order assignments.",
         "PPO": "Uses a trained policy network to choose legal driver/order assignments.",
     }
@@ -116,7 +116,7 @@ class DeliveryGame:
         score = tk.Label(panel, text="0 PTS", bg="#253754", fg=self.COLORS["yellow"], font=("TkDefaultFont", 24, "bold"), padx=8, pady=8)
         score.pack(fill=tk.X, pady=(0, 12))
         stat_labels: dict[str, tk.Label] = {}
-        for key, title in (("delivered", "DELIVERED"), ("pending", "PENDING AT END"), ("avg_time", "AVG DELIVERY"), ("travel", "TRAVELLED"), ("free", "DRIVERS FREE")):
+        for key, title in (("delivered", "DELIVERED"), ("pending", "PENDING AT END"), ("overdue", "OVERDUE"), ("waiting", "WAITING FOR FOOD"), ("avg_time", "AVG DELIVERY"), ("travel", "TRAVELLED"), ("free", "DRIVERS FREE")):
             row = tk.Frame(panel, bg=self.COLORS["panel"])
             row.pack(fill=tk.X, pady=4)
             tk.Label(row, text=title, bg=self.COLORS["panel"], fg=self.COLORS["muted"], font=("TkDefaultFont", 8, "bold")).pack(side=tk.LEFT)
@@ -370,7 +370,7 @@ class DeliveryGame:
             self.decision_feed.delete("1.0", f"{line_count - 28}.0")
         if added_events == 0:
             active_env = self.envs[self.active_player_index]
-            self.decision_feed.insert(tk.END, f"{max(0, active_env.time - 1):02d}:00  No assignment: no ready orders or all drivers are busy.\n")
+            self.decision_feed.insert(tk.END, f"{max(0, active_env.time - 1):02d}:00  No assignment: no unassigned orders or all drivers are busy.\n")
         self.decision_feed.configure(state=tk.DISABLED)
         self.decision_feed.see(tk.END)
 
@@ -429,7 +429,9 @@ class DeliveryGame:
                 if driver.order_id is not None:
                     canvas.create_text(dx + 5, dy + 8, text=f"O{driver.order_id}", anchor=tk.W, fill=self.player_colors[player_index], font=("TkDefaultFont", 7, "bold"))
             available = driver.status == DriverStatus.AVAILABLE
-            color = self.COLORS["green"] if available else self.player_colors[player_index]
+            waiting_for_food = driver.status == DriverStatus.WAITING_FOR_FOOD
+            color = (self.COLORS["green"] if available else
+                     self.COLORS["purple"] if waiting_for_food else self.player_colors[player_index])
             canvas.create_oval(x - 7, y - 7, x + 7, y + 7, fill=color, outline="#f8fafc", width=1)
             canvas.create_text(x, y, text="D", fill="#082f49", font=("TkDefaultFont", 7, "bold"))
             canvas.create_text(x + 7, y - 8, text=f"D{driver.driver_id + 1}", anchor=tk.W, fill="#f8fafc", font=("TkDefaultFont", 7, "bold"))
@@ -440,6 +442,8 @@ class DeliveryGame:
         values = {
             "delivered": f"{len(delivered)} / {len(env.orders)}",
             "pending": str(len(env.pending_orders)),
+            "overdue": str(sum(o.deadline_at < env.time for o in env.pending_orders)),
+            "waiting": str(sum(d.status == DriverStatus.WAITING_FOR_FOOD for d in env.drivers)),
             "avg_time": f"{average:.1f} min" if average is not None else "—",
             "travel": f"{env.total_travel_distance:.0f} units",
             "free": str(sum(d.status == DriverStatus.AVAILABLE for d in env.drivers)),
@@ -470,6 +474,7 @@ class DeliveryGame:
         average = sum(o.delivered_at - o.created_at for o in delivered if o.delivered_at is not None) / len(delivered) if delivered else math.inf
         return {
             "score": env.total_reward,
+            "rl_reward": env.total_training_reward,
             "delivered": len(delivered),
             "average": average,
             "distance": env.total_travel_distance,
@@ -491,10 +496,13 @@ class DeliveryGame:
             lines.extend([
                 f"{name} — {self.policies[i].name}",
                 f"Score: {result['score']:.0f} points  |  Delivered: {result['delivered']} / {len(env.orders)}",
+                f"RL reward (training metric): {result['rl_reward']:.1f}",
                 f"Pending at cutoff: {len(env.pending_orders)}  |  Average delivery: {avg}",
                 f"Travel distance: {env.total_travel_distance:.1f} units",
                 "",
             ])
+        lines.append("Game winner is decided by delivery points, then delivery time, then distance.")
+        lines.append("RL reward is a separate training metric with waiting, late, travel, idle, and cutoff penalties.")
         lines.append("Orders still in preparation or travel at the 60-minute cutoff remain pending.")
         messagebox.showinfo("Dispatch duel results", "\n".join(lines), parent=self.root)
 

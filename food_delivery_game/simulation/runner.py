@@ -13,6 +13,7 @@ class EpisodeMetrics:
     seed: int
     delivered: int
     total_reward: float
+    total_training_reward: float
     average_delivery_time: float
     total_travel_distance: float
 
@@ -34,6 +35,7 @@ def run_policy_episode(policy, config: SimulationConfig, seed: int | None = None
         seed=config.seed if seed is None else seed,
         delivered=len(env.delivered_orders),
         total_reward=env.total_reward,
+        total_training_reward=env.total_training_reward,
         average_delivery_time=sum(delivery_times) / len(delivery_times) if delivery_times else 0.0,
         total_travel_distance=env.total_travel_distance,
     )

@@ -36,15 +36,17 @@ When the game opens, enter both player names. Each player then chooses a strateg
 ## Game rules and assumptions
 
 - Each player receives a separate 60-simulated-minute run. Player 1 runs first, then Player 2; automatic play advances one game minute every real second, so a full match takes about two minutes. The active player's clock and map update while the other player's finished or waiting state remains visible. Pausing stops the active run.
-- Each player gets a separate copy of the same scenario: same map, restaurant and driver positions, order arrivals, preparation times, and random seed. Only the dispatch strategy differs.
-- Orders arrive at the start of each simulated minute at the shared configured rate. Their restaurant, customer location, and preparation time are generated from the match seed.
-- Food preparation takes 0 or 1 game minute in this prototype. The travel rate is a fixed internal setting shared by both players.
-- A ready order can be assigned to one available driver. The driver travels to the restaurant, picks up the order, and continues to the customer. Travel speed is fixed inside the simulation so neither player can tune it to gain an advantage.
-- Each completed delivery earns 10 points. At the 60-minute cutoff, orders still preparing, waiting for a driver, or in transit remain pending and earn no delivery points.
-- The player with more points wins. If points tie, the player with the lower average delivery time wins; if that also ties, the shorter total travel distance wins. If all three measures tie, the match is a draw.
+- Both runs use the same pre-sampled scenario: map, restaurant and driver positions, order arrivals, customer locations, actual and estimated preparation times, deadlines, and minute-by-minute traffic. Only the dispatch policy differs. Scenario randomness is generated before play, so policy decisions cannot change later random events.
+- Orders arrive according to a Poisson process at the configured average orders per simulated minute. The opening state also includes an initial backlog equal to half the configured arrival rate (rounded to an integer). Restaurant, customer, preparation, and traffic samples are seeded and repeatable.
+- Restaurants are placed at least 12 map units apart (spacing relaxes only if the map is crowded). Each customer's location is sampled within 28 map units of the order's restaurant and clipped to the map boundary, following the alternate project's local service-area model.
+- Actual food preparation time is sampled from a normal distribution (mean 0.5, standard deviation 0.17 game minutes), clipped to 0.15–1.0 minutes. The dispatcher sees a noisy preparation estimate, not the actual ready time. Orders may be assigned while preparing; a driver who arrives early waits at the restaurant.
+- Deadlines are estimated from preparation estimate + restaurant-to-customer travel time at nominal traffic + five minutes of slack. Pickup time and realized traffic still affect actual delivery time and whether it is late. All policies see the traffic level's nominal speed; the simulation applies correlated minute-to-minute traffic noise around that level (clipped between 0.5× and 1.5× nominal).
+- Traffic levels scale the base travel speed: light = 1.2×, normal = 1.0×, and heavy = 0.7×. Restaurant count, driver count, and average order rate are shared between the two players.
+- Each completed delivery earns 10 game points. At the 60-minute cutoff, orders still preparing, waiting for a driver, or in transit remain pending. The player with more game points wins; ties are broken by lower average delivery time, then shorter total travel distance. If all three measures tie, the match is a draw.
+- RL training and evaluation also report a separate shaped reward adapted from `munchkin-alt`: +10 per delivery, −2 per pending order-minute, −4 per overdue order-minute, −0.1 per travel-distance unit, −1 per idle driver-minute when unassigned orders are available, and −5 per unfinished order at the episode cutoff. The game winner is still determined by game points and the tie-breakers, not this RL reward. Batch-savings reward is currently zero because the main simulator does not support multi-order batching; invalid actions are masked before selection.
 - The decision feed shows each assignment and the policy's reason. The side panels show each player's score, delivered and pending orders, average delivery time, distance travelled, and available drivers.
 
-The one-hour head-to-head match is the interactive game mode. The assignment's formal strategy comparison remains a separate experiment: the command-line comparison uses the default three-simulated-minute horizon, shared seeds, and the same conditions for all baselines.
+The one-hour head-to-head match is the interactive game mode. Command-line strategy comparisons use matched seeds and identical scenario settings for every policy; their horizon can be set with `--minutes`.
 
 ## Compare the baselines
 
@@ -54,18 +56,23 @@ Run matched episodes for all three strategies from the project root:
 python3 -m food_delivery_game.compare --episodes 20
 ```
 
-Every strategy receives the same seed for each three-minute comparison episode. You can also pass `--seed`, `--drivers`, `--restaurants`, or `--orders-per-minute` to change the experiment setup.
+Every strategy receives the same seed for each comparison episode. You can also pass `--seed`, `--drivers`, `--restaurants`, `--orders-per-minute`, `--traffic`, or `--minutes` to change the experiment setup.
 
 ## Train DQN and PPO
 
-Both agents use the same simulator as the baselines. At each decision, the agent may assign one
-ready order to an available delivery partner or choose **wait**, which advances the simulated
-minute. Assignments earn no immediate reward; each completed delivery earns 10 points. Training
-randomizes the number of restaurants, delivery partners, and order rate across episodes. The
-observation contains normalized driver state, ready-order details, pairwise estimated travel time,
-and shared scenario settings. Invalid assignments are masked from both algorithms.
+Both agents use the same simulator as the baselines. At each decision, an agent may assign one
+preparing or ready order to an available delivery partner or choose **wait**, which advances the
+simulated minute. Assignments earn no immediate reward; deliveries earn game points and the
+separate shaped RL reward described above. Training randomizes restaurant count, driver count,
+arrival rate, and traffic level. The observation contains normalized driver state (including
+restaurant waiting and estimated time until free), order preparation/deadline estimates, pairwise
+estimated delivery time, and shared scenario settings. Invalid assignments are masked.
 
-Train either agent from the project root:
+Train either agent from the project root. Validation runs every 25 episodes on fixed
+low-demand/light-traffic, medium-demand/normal-traffic, and heavy-demand/heavy-traffic scenarios,
+then keeps the checkpoint with the best mean shaped RL reward rather than blindly saving the last
+episode. Scenario and reward changes, plus the updated observation layout, make older checkpoints
+incompatible; retrain both agents before comparing:
 
 ```bash
 python3 -m food_delivery_game.rl.train --algorithm dqn --episodes 500
@@ -73,7 +80,9 @@ python3 -m food_delivery_game.rl.train --algorithm ppo --episodes 500
 ```
 
 Checkpoints are saved as `models/dqn.pt` and `models/ppo.pt`; episode logs are saved alongside
-them. To compare the baselines and any trained RL models on matched seeds:
+them, with metadata describing the observation version and validation score. The shared scenario
+report prints delivery points and shaped RL reward separately. To compare the baselines and any
+trained RL models on matched seeds:
 
 ```bash
 python3 -m food_delivery_game.rl.evaluate --episodes 20 --minutes 60
