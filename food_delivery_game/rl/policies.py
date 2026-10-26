@@ -18,10 +18,9 @@ class RLDispatchPolicy:
         if self.algorithm == "DQN":
             action = self.agent.act(observation, mask, epsilon=0.0)
         else:
-            # PPO represents a categorical policy. Sampling follows the trained
-            # policy; greedy argmax can collapse to WAIT even when dispatch
-            # actions collectively carry most of the policy probability.
-            action, _, _ = self.agent.act(observation, mask, deterministic=False)
+            # Use greedy masked action selection so the same state always yields
+            # the same dispatch in CLI evaluation and the interactive match.
+            action, _, _ = self.agent.act(observation, mask, deterministic=True)
         if action == WAIT_ACTION:
             return None
         driver_index, order_slot = divmod(action, MAX_ORDERS)

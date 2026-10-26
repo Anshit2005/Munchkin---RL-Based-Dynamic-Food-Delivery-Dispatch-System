@@ -65,11 +65,7 @@ def print_report(episodes: int = 5, minutes: int = 60, seed: int = 2026,
                     episode_minutes=minutes,
                     seed=episode_seed,
                 )
-                # Recreate per episode so any stochastic PPO sampling is isolated
-                # and reproducible for the same strategy/scenario/seed sequence.
                 policy = create_policy(strategy) if strategy in POLICIES else create_rl_policy(strategy)
-                if strategy == "PPO":
-                    policy.agent.generator.manual_seed(episode_seed)
                 metrics.append(run_policy_episode(policy, config, seed=episode_seed))
             delivered = _mean([float(item.delivered) for item in metrics])
             reward = _mean([item.total_reward for item in metrics])

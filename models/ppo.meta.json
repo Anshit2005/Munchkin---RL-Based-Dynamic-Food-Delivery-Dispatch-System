@@ -1,0 +1,11 @@
+{
+  "algorithm": "PPO",
+  "checkpoint_episode": 300,
+  "training_episodes": 500,
+  "gradient_updates": null,
+  "observation_size": 1849,
+  "action_count": 1025,
+  "observation_version": 4,
+  "reward_scale": 0.1,
+  "validation_score": -4806.943940157751
+}

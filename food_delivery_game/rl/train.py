@@ -25,6 +25,8 @@ from .ppo import PPOAgent
 from .state import N_ACTIONS, OBS_SIZE, OBS_VERSION
 
 MODEL_DIR = PROJECT_ROOT / "models"
+DQN_MIN_REPLAY = 32
+DQN_BATCH_SIZE = 128
 
 
 def _episode_config(seed: int, minutes: int) -> SimulationConfig:
@@ -41,13 +43,16 @@ def _episode_config(seed: int, minutes: int) -> SimulationConfig:
 
 
 def _save(path: Path, algorithm: str, agent, agent_config: dict, episodes: int,
-          reward_scale: float, validation_score: float):
+          reward_scale: float, validation_score: float, training_episodes: int,
+          gradient_updates: int | None = None):
     path.parent.mkdir(parents=True, exist_ok=True)
     checkpoint = {
         "algorithm": algorithm,
         "state_dict": agent.state_dict(),
         "agent_config": agent_config,
-        "episodes": episodes,
+        "checkpoint_episode": episodes,
+        "training_episodes": training_episodes,
+        "gradient_updates": gradient_updates,
         "observation_size": OBS_SIZE,
         "action_count": N_ACTIONS,
         "observation_version": OBS_VERSION,
@@ -58,8 +63,9 @@ def _save(path: Path, algorithm: str, agent, agent_config: dict, episodes: int,
     metadata_path = path.with_name(f"{path.stem}.meta.json")
     metadata_path.write_text(json.dumps({
         key: checkpoint[key] for key in (
-            "algorithm", "episodes", "observation_size", "action_count",
-            "observation_version", "reward_scale", "validation_score",
+            "algorithm", "checkpoint_episode", "training_episodes", "gradient_updates",
+            "observation_size", "action_count", "observation_version", "reward_scale",
+            "validation_score",
         )
     }, indent=2) + "\n", encoding="utf-8")
 
@@ -81,8 +87,6 @@ def _validate(agent, algorithm: str, episodes: int, minutes: int, seed: int) -> 
                 episode_minutes=minutes,
                 seed=episode_seed,
             )
-            if algorithm == "PPO":
-                agent.generator.manual_seed(episode_seed)
             rewards.append(run_policy_episode(policy, config, episode_seed).total_training_reward)
     return sum(rewards) / len(rewards)
 
@@ -102,9 +106,10 @@ def train_dqn(episodes: int, minutes: int, seed: int, hidden: int = 128,
     total_steps = max(1, episodes * minutes * 3)
     target_sync = 1000
     best_validation = float("-inf")
+    gradient_updates = 0
 
     with log_path.open("w", newline="", encoding="utf-8") as log_file:
-        writer = csv.DictWriter(log_file, fieldnames=["episode", "score", "shaped_return", "steps", "epsilon", "loss", "validation_score"])
+        writer = csv.DictWriter(log_file, fieldnames=["episode", "score", "shaped_return", "steps", "epsilon", "loss", "gradient_updates", "validation_score"])
         writer.writeheader()
         for episode in range(1, episodes + 1):
             env = RLDeliveryEnvironment(_episode_config(seed + episode, minutes))
@@ -121,24 +126,29 @@ def train_dqn(episodes: int, minutes: int, seed: int, hidden: int = 128,
                 episode_steps += 1
                 episode_return += info["score_reward"]
                 shaped_return += reward
-                if len(replay) >= 256 and global_step % 4 == 0:
-                    last_loss = agent.learn(replay.sample(128, rng))
+                if len(replay) >= DQN_MIN_REPLAY and global_step % 4 == 0:
+                    last_loss = agent.learn(replay.sample(DQN_BATCH_SIZE, rng))
+                    gradient_updates += 1
                 if global_step % target_sync == 0:
                     agent.target.load_state_dict(agent.q.state_dict())
             validation_text = ""
             if episode % eval_every == 0 or episode == episodes:
                 validation = _validate(agent, "DQN", validation_episodes, minutes, seed + 900_000)
                 validation_text = validation
-                if validation > best_validation:
+                if validation > best_validation and gradient_updates > 0:
                     best_validation = validation
-                    _save(output, "DQN", agent, config, episode, reward_scale, validation)
+                    _save(output, "DQN", agent, config, episode, reward_scale, validation,
+                          episodes, gradient_updates)
                 print(f"DQN episode {episode}/{episodes}: score={env.sim.total_reward:.1f}, "
                       f"validation={validation:.1f}, best={best_validation:.1f}, "
                       f"epsilon={epsilon:.3f}", flush=True)
             writer.writerow({"episode": episode, "score": episode_return,
                              "shaped_return": shaped_return, "steps": episode_steps,
                              "epsilon": epsilon, "loss": last_loss,
+                             "gradient_updates": gradient_updates,
                              "validation_score": validation_text})
+    if gradient_updates == 0:
+        raise RuntimeError("DQN training completed without a gradient update; no checkpoint was saved")
     return output
 
 
@@ -180,7 +190,8 @@ def train_ppo(episodes: int, minutes: int, seed: int, hidden: int = 128,
                 validation_text = validation
                 if validation > best_validation:
                     best_validation = validation
-                    _save(output, "PPO", agent, config, episode, reward_scale, validation)
+                    _save(output, "PPO", agent, config, episode, reward_scale, validation,
+                          episodes)
                 print(f"PPO episode {episode}/{episodes}: score={env.sim.total_reward:.1f}, "
                       f"validation={validation:.1f}, best={best_validation:.1f}, "
                       f"policy_loss={stats['policy_loss']:.4f}", flush=True)

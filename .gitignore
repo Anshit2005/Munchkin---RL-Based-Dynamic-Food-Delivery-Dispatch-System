@@ -6,3 +6,7 @@ venv/
 .vscode/
 results/
 models/
+!models/
+models/*
+!models/*.pt
+!models/*.meta.json

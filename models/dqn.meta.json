@@ -1,0 +1,11 @@
+{
+  "algorithm": "DQN",
+  "checkpoint_episode": 175,
+  "training_episodes": 500,
+  "gradient_updates": 12896,
+  "observation_size": 1849,
+  "action_count": 1025,
+  "observation_version": 4,
+  "reward_scale": 0.1,
+  "validation_score": -3949.2885136328364
+}

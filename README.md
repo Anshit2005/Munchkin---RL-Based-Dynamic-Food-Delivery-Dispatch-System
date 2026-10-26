@@ -68,6 +68,11 @@ arrival rate, and traffic level. The observation contains normalized driver stat
 restaurant waiting and estimated time until free), order preparation/deadline estimates, pairwise
 estimated delivery time, and shared scenario settings. Invalid assignments are masked.
 
+The repository includes the trained DQN and PPO checkpoints (`models/*.pt`) and their metadata,
+so evaluators can run comparisons immediately after cloning. DQN begins learning once its replay
+buffer reaches 32 transitions and refuses to save a checkpoint if no gradient update occurred.
+Both learned policies use deterministic masked action selection during evaluation and in the GUI.
+
 Train either agent from the project root. Validation runs every 25 episodes on fixed
 low-demand/light-traffic, medium-demand/normal-traffic, and heavy-demand/heavy-traffic scenarios,
 then keeps the checkpoint with the best mean shaped RL reward rather than blindly saving the last
