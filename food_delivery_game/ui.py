@@ -215,7 +215,7 @@ class DeliveryGame:
         self.activity_label = tk.Label(heading, text="● READY", bg=self.COLORS["background"], fg=self.COLORS["green"], font=("TkDefaultFont", 10, "bold"))
         self.activity_label.pack(side=tk.RIGHT)
 
-        # Bottom-anchored controls are packed first with side=BOTTOM so they are NEVER pushed off screen
+        # Bottom-anchored controls are packed first with side=BOTTOM so they are not pushed off screen
         self._build_common_controls(center)
 
         feed_panel = tk.Frame(center, bg=self.COLORS["card"], padx=8, pady=3)
@@ -322,7 +322,7 @@ class DeliveryGame:
         traffic_frame = tk.Frame(sliders, bg=self.COLORS["panel"])
         traffic_frame.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(6, 0))
         tk.Label(traffic_frame, text="Traffic condition", bg=self.COLORS["panel"], fg=self.COLORS["muted"], font=("TkDefaultFont", 8)).pack(anchor="w")
-        self.traffic_selector = ttk.Combobox(traffic_frame, values=["Normal (1.0×)", "Light / Clear (1.2×)", "Heavy (0.7×)"], state="readonly", width=16)
+        self.traffic_selector = ttk.Combobox(traffic_frame, values=["Normal (1.0×)", "Light (1.2×)", "Heavy (0.7×)"], state="readonly", width=14)
         self.traffic_selector.current(0)
         self.traffic_selector.pack(fill=tk.X, pady=(3, 0))
 
@@ -371,12 +371,7 @@ class DeliveryGame:
             self.policies[player_index] = create_policy(self.strategy_selectors[player_index].get())
 
     def _make_config(self, seed: int) -> SimulationConfig:
-        traffic_map = {
-            "Normal (1.0×)": "normal",
-            "Light / Clear (1.2×)": "light",
-            "Light (1.2×)": "light",
-            "Heavy (0.7×)": "heavy",
-        }
+        traffic_map = {"Normal (1.0×)": "normal", "Light (1.2×)": "light", "Heavy (0.7×)": "heavy"}
         traffic_level = "normal"
         if hasattr(self, "traffic_selector"):
             traffic_level = traffic_map.get(self.traffic_selector.get(), "normal")
@@ -665,18 +660,18 @@ class DeliveryGame:
         self.progress.create_rectangle(0, 0, width, height, fill="#17263d", outline="")
         if fraction:
             self.progress.create_rectangle(0, 0, width * fraction, height, fill=self.COLORS["cyan"], outline="")
-            self.progress.create_oval(max(0, width * fraction - 2), 0, width * fraction + 2, height, fill="#e0fbff", outline="")
+            self.progress.create_oval(max(1, width * fraction - 5), 2, width * fraction + 5, height - 2, fill="#e0fbff", outline="")
         elapsed_seconds = min(round(elapsed * 60), self.MATCH_MINUTES * 60)
         hours, rem = divmod(elapsed_seconds, 60)
         self.clock_label.configure(text=f"P{self.active_player_index + 1} · {hours:02d}:{rem:02d} / 60:00")
         if hasattr(self, "traffic_label") and hasattr(active_env, "traffic_profile") and active_env.traffic_profile:
             current_traffic = active_env.traffic_profile[min(active_env.time, len(active_env.traffic_profile) - 1)]
             if current_traffic >= 1.1:
-                traffic_desc, traffic_color = "CLEAR / LIGHT", self.COLORS["green"]
+                traffic_desc, traffic_color = "LIGHT", self.COLORS["green"]
             elif current_traffic <= 0.85:
-                traffic_desc, traffic_color = "HEAVY TRAFFIC", self.COLORS["red"]
+                traffic_desc, traffic_color = "HEAVY", self.COLORS["orange"]
             else:
-                traffic_desc, traffic_color = "NORMAL / MODERATE", self.COLORS["yellow"]
+                traffic_desc, traffic_color = "NORMAL", self.COLORS["yellow"]
             self.traffic_label.configure(text=f"TRAFFIC: {current_traffic:.2f}× ({traffic_desc})", fg=traffic_color)
 
     def _results_for(self, env: DeliveryEnvironment) -> dict[str, float | int]:
