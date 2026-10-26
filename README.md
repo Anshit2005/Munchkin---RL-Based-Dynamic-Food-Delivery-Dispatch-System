@@ -1,129 +1,203 @@
-# Munchkin - RL Based Dynamic Food Delivery Dispatch System
+# Munchkin: RL-Based Dynamic Food Delivery Dispatch System
 
-Munchkin is a head-to-head food-delivery dispatch game and a simulator for comparing dispatch strategies. Two players choose policies that run against matching copies of the same simulated city. Available strategies include three heuristic baselines and trained DQN/PPO policies.
+Munchkin is a small food-delivery dispatch simulator and strategy-comparison game. It models orders arriving over time, restaurant preparation, traffic, deadlines, and a limited fleet of delivery partners. Players can compare three dispatch heuristics with trained Deep Q-Network (DQN) and Proximal Policy Optimization (PPO) policies in the graphical game or in repeatable command-line experiments.
 
-## Requirements
+**Repository:** [Anshit2005/Munchkin](https://github.com/Anshit2005/Munchkin---RL-Based-Dynamic-Food-Delivery-Dispatch-System)
+
+**Team:** Anshit Agarwal and Namya Dhingra
+
+## Visual overview
+
+The preview shows the two-player dispatch interface. The chart summarizes the saved five-seed comparisons across demand levels and driver counts, alongside the 25-episode moving-average training scores.
+
+![Munchkin two-player dispatch game interface preview](reports/munchkin_rl_report/images/simulation.png)
+
+![Munchkin strategy comparison results across demand and fleet size, with DQN and PPO training curves](reports/munchkin_rl_report/images/results.png)
+
+## Quick start
+
+These steps install the project, launch the game, and run the five-policy scenario report. The repository includes trained DQN and PPO checkpoints, so the comparison commands work without training first.
+
+### 1. Requirements and installation
 
 - Python 3.10 or newer
-- Tkinter (usually included with Python; Linux distributions may package it separately)
+- Tkinter for the desktop game (often included with Python)
+- NumPy and PyTorch for reinforcement-learning policies and training
 
-The simulator and interface use Python's standard library. DQN and PPO training require NumPy and PyTorch.
+Clone the repository and enter its folder:
 
-Install dependencies in a virtual environment. Run the activation command for your shell from the project folder.
+```bash
+git clone https://github.com/Anshit2005/Munchkin---RL-Based-Dynamic-Food-Delivery-Dispatch-System.git
+cd Munchkin---RL-Based-Dynamic-Food-Delivery-Dispatch-System
+```
+
+Create and activate a virtual environment, then install Python dependencies:
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
+python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-On Windows PowerShell, activate with:
+On Windows PowerShell, activate the environment with:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
 ```
 
-## Run
-
-From the project root:
+On Ubuntu/Debian, if importing Tkinter fails, install the operating-system package and retry:
 
 ```bash
-python3 -m food_delivery_game
+sudo apt update
+sudo apt install python3-tk
 ```
 
-When the game opens, enter both player names. Each player then chooses a strategy (heuristic baselines or trained DQN/PPO). Set the shared restaurant count, driver count, arrival rate, and traffic condition in the controls below the maps. Use the **Speed controls** (`1×`, `2×`, `5×`, `10×`) to speed up or slow down the match at any time. Press **Start match** to begin, or use **Step one game minute** to step through decisions manually. A **Map Legend** above the active clock clarifies all symbols for restaurants, cooking/ready food, delivered orders, and drivers.
+`requirements.txt` installs NumPy and PyTorch. Tkinter is provided by Python/your operating system, not by this requirements file.
 
-## Game rules and assumptions
+### 2. Play the game
 
-- Each player receives a separate 60-simulated-minute run. Player 1 runs first, then Player 2; automatic play advances one game minute every real second, so a full match takes about two minutes. The active player's clock and map update while the other player's finished or waiting state remains visible. Pausing stops the active run.
-- Both runs use the same pre-sampled scenario: map, restaurant and driver positions, order arrivals, customer locations, actual and estimated preparation times, deadlines, and minute-by-minute traffic. Only the dispatch policy differs. Scenario randomness is generated before play, so policy decisions cannot change later random events.
-- Orders arrive according to a Poisson process at the configured average orders per simulated minute. The opening state also includes an initial backlog equal to half the configured arrival rate (rounded to an integer). Restaurant, customer, preparation, and traffic samples are seeded and repeatable.
-- Restaurants are placed at least 12 map units apart (spacing relaxes only if the map is crowded). Each customer's location is sampled within 28 map units of the order's restaurant and clipped to the map boundary, following the alternate project's local service-area model.
-- Actual food preparation time is sampled from a normal distribution (mean 0.5, standard deviation 0.17 game minutes), clipped to 0.15–1.0 minutes. The dispatcher sees a noisy preparation estimate, not the actual ready time. Orders may be assigned while preparing; a driver who arrives early waits at the restaurant.
-- Deadlines are estimated from preparation estimate + restaurant-to-customer travel time at nominal traffic + five minutes of slack. Pickup time and realized traffic still affect actual delivery time and whether it is late. All policies see the traffic level's nominal speed; the simulation applies correlated minute-to-minute traffic noise around that level (clipped between 0.5× and 1.5× nominal).
-- Traffic levels scale the base travel speed: light = 1.2×, normal = 1.0×, and heavy = 0.7×. Restaurant count, driver count, and average order rate are shared between the two players.
-- Each completed delivery earns 10 game points. At the 60-minute cutoff, orders still preparing, waiting for a driver, or in transit remain pending. The player with more game points wins; ties are broken by lower average delivery time, then shorter total travel distance. If all three measures tie, the match is a draw.
-- RL training and evaluation also report a separate shaped reward adapted from `munchkin-alt`: +10 per delivery, −2 per pending order-minute, −4 per overdue order-minute, −0.1 per travel-distance unit, −1 per idle driver-minute when unassigned orders are available, and −5 per unfinished order at the episode cutoff. The game winner is still determined by game points and the tie-breakers, not this RL reward. Batch-savings reward is currently zero because the main simulator does not support multi-order batching; invalid actions are masked before selection.
-- The decision feed shows each assignment and the policy's reason. The side panels show each player's score, delivered and pending orders, average delivery time, distance travelled, and available drivers.
-
-The one-hour head-to-head match is the interactive game mode. Command-line strategy comparisons use matched seeds and identical scenario settings for every policy; their horizon can be set with `--minutes`.
-
-## Compare the baselines
-
-Run matched episodes for all three strategies from the project root:
+From the repository root with the virtual environment active:
 
 ```bash
-python3 -m food_delivery_game.compare --episodes 20
+python -m food_delivery_game
 ```
 
-Every strategy receives the same seed for each comparison episode. You can also pass `--seed`, `--drivers`, `--restaurants`, `--orders-per-minute`, `--traffic`, or `--minutes` to change the experiment setup.
+Enter names for Player 1 and Player 2, choose one strategy for each, then set the shared order rate, restaurant count, driver count, and traffic. Start the match to run each player's 60-game-minute simulation in sequence, or step the active simulation one game minute at a time. The speed buttons change playback speed; they do not change the simulated episode length. Each player sees their map, live dispatch feed, deliveries, pending orders, score, average delivery time, distance, and available drivers.
 
-## Train DQN and PPO
+Strategies in the player selector are:
 
-Both agents use the same simulator as the baselines. At each decision, an agent may assign one
-preparing or ready order to an available delivery partner or choose **wait**, which advances the
-simulated minute. Assignments earn no immediate reward; deliveries earn game points and the
-separate shaped RL reward described above. Training randomizes restaurant count, driver count,
-arrival rate, and traffic level. The observation contains normalized driver state (including
-restaurant waiting and estimated time until free), order preparation/deadline estimates, pairwise
-estimated delivery time, and shared scenario settings. Invalid assignments are masked.
+- **Nearest Driver** — assigns the available driver/order pair with the shortest driver-to-restaurant pickup distance.
+- **Oldest / Most Urgent** — selects the order with the least estimated deadline slack, breaking ties by age, then sends the driver with the shortest estimated completion time.
+- **Minimum Estimated Delivery Time** — selects the legal driver/order assignment with the shortest estimated delivery time.
+- **DQN** and **PPO** — load the included trained policy checkpoints.
 
-The repository includes the trained DQN and PPO checkpoints (`models/*.pt`) and their metadata,
-so evaluators can run comparisons immediately after cloning. DQN begins learning once its replay
-buffer reaches 32 transitions and refuses to save a checkpoint if no gradient update occurred.
-Both learned policies use deterministic masked action selection during evaluation and in the GUI.
+### 3. Reproduce the model comparisons
 
-Train either agent from the project root. Validation runs every 25 episodes on fixed
-low-demand/light-traffic, medium-demand/normal-traffic, and heavy-demand/heavy-traffic scenarios,
-then keeps the checkpoint with the best mean shaped RL reward rather than blindly saving the last
-episode. Scenario and reward changes, plus the updated observation layout, make older checkpoints
-incompatible; retrain both agents before comparing:
+Run the standard terminal report for all three baselines, DQN, and PPO across low, medium, and high demand. It uses five matched random seeds per scenario by default and prints completed orders, game points, shaped RL reward, delivery time, and distance:
 
 ```bash
-python3 -m food_delivery_game.rl.train --algorithm dqn --episodes 500
-python3 -m food_delivery_game.rl.train --algorithm ppo --episodes 500
+python -m food_delivery_game.rl.scenario_report
 ```
 
-Checkpoints are saved as `models/dqn.pt` and `models/ppo.pt`; episode logs are saved alongside
-them, with metadata describing the observation version and validation score. The shared scenario
-report prints delivery points and shaped RL reward separately. To compare the baselines and any
-trained RL models on matched seeds:
+Choose the number of matched episodes, horizon, seed, fleet, or restaurant count with:
 
 ```bash
-python3 -m food_delivery_game.rl.evaluate --episodes 20 --minutes 60
+python -m food_delivery_game.rl.scenario_report --episodes 10 --minutes 60 --seed 2026 --drivers 8 --restaurants 5
 ```
 
-Print a terminal report for all three baselines plus DQN and PPO across low, medium, and heavy
-demand (five matched episodes per scenario by default):
+To run one matched-seed comparison at a chosen demand and traffic level, comparing all available baselines and RL checkpoints:
 
 ```bash
-python3 -m food_delivery_game.rl.scenario_report
+python -m food_delivery_game.rl.evaluate --episodes 20 --minutes 60 --seed 1000 --drivers 8 --restaurants 5 --orders-per-minute 5
 ```
 
-Change the episode count or shared setup with options such as
-`--episodes 10 --drivers 8 --restaurants 5`.
+This command writes `results/rl_comparison.csv` as well as printing the summary. For a baseline-only comparison (no trained checkpoint required), use:
 
-After training, restart the game. A DQN or PPO strategy appears in the player selector when its
-checkpoint exists. DQN selects its highest-value legal action; PPO samples from its learned
-categorical policy, which is the action-selection method used during PPO training.
+```bash
+python -m food_delivery_game.compare --episodes 20 --minutes 60 --seed 7 --drivers 8 --restaurants 5 --orders-per-minute 5 --traffic normal
+```
 
-## Project layout
+### 4. Train or retrain DQN and PPO
+
+The saved checkpoints are included at `models/dqn.pt` and `models/ppo.pt`, with metadata in the corresponding `.meta.json` files. To reproduce training, train each model from the repository root:
+
+```bash
+python -m food_delivery_game.rl.train --algorithm dqn --episodes 500
+python -m food_delivery_game.rl.train --algorithm ppo --episodes 500
+```
+
+Training evaluates on fixed low-demand/light-traffic, medium-demand/normal-traffic, and high-demand/heavy-traffic scenarios every 25 episodes, retaining the best validation checkpoint. It writes weights and metadata to `models/`, and per-episode training logs to `models/dqn_training.csv` and `models/ppo_training.csv`. To run a shorter smoke-scale training session, reduce `--episodes`; such a run is not comparable to the supplied 500-episode checkpoints.
+
+After retraining, rerun the scenario report or parameter sweep to compare the newly saved models with the baselines. If checkpoints are missing or reported as incompatible, run both training commands above first.
+
+### 5. Generate the multi-configuration report
+
+Run the full evaluation suite to compare all five policies across demand, traffic, restaurant count, driver count, and two capacity-stress scenarios:
+
+```bash
+python -m food_delivery_game.rl.parameter_report
+```
+
+By default, it evaluates five matched episodes for each of 11 configurations and each strategy, then writes:
+
+- `results/parameter_report.md` — readable tables and experiment method
+- `results/parameter_report_summary.csv` — per-configuration means and standard deviations
+- `results/parameter_report_episodes.csv` — raw episode-level measurements
+
+For a faster check or a larger experiment with a separate output directory:
+
+```bash
+python -m food_delivery_game.rl.parameter_report --episodes 1 --minutes 60
+python -m food_delivery_game.rl.parameter_report --episodes 10 --minutes 60 --seed 1234 --output-dir results/full_run
+```
+
+Five seeds provide a repeatable screening comparison, not strong statistical evidence. Increase `--episodes` for more stable estimates. The full sweep runs 11 configurations × 5 policies × N episodes and may take a while.
+
+## Project and game rules
+
+Each match is a one-hour simulation for each player. One real second corresponds to one game minute at normal playback speed. Player 1 runs first and Player 2 then runs the same pre-sampled scenario. Their strategy is the experimental variable; restaurant and driver locations, customer locations, order arrivals, preparation samples, deadlines, and traffic sequence are shared.
+
+- The city map is 100 × 70 units. Restaurant placement targets at least 12 units between restaurants, relaxing when the map is crowded. A customer's location is sampled within 28 units of the restaurant and clipped to the map.
+- Orders arrive at the configured average rate according to a Poisson process. The opening backlog is half the order rate, rounded to an integer.
+- Actual preparation time is sampled from a normal distribution (mean 0.5, standard deviation 0.17 game minutes), clipped to 0.15–1.0 minutes. Dispatchers receive a noisy estimate; a driver can be sent while food is still preparing and waits at the restaurant if it arrives early.
+- The deadline estimate is preparation estimate + nominal restaurant-to-customer travel time + five minutes of slack. Traffic varies during the episode around the selected traffic level.
+- Light, normal, and heavy traffic use speed multipliers 1.2×, 1.0×, and 0.7× respectively. The simulation adds minute-to-minute traffic noise, clipped to 0.5×–1.5× the selected nominal speed.
+- Each completed delivery is worth 10 game points. Orders still preparing, awaiting a driver, or in transit at the 60-minute cutoff remain pending. The higher score wins; ties use lower average delivery time, then shorter total travel distance.
+- The main simulator supports one order per driver at a time; it does not support multi-order batching.
+
+The game scoreboard and the RL training reward are different objectives. The shaped reward, accumulated per simulated minute, is:
+
+```text
+R = 10 × deliveries − 2 × pending_orders − 4 × overdue_orders
+    − 0.1 × distance − idle_driver_cost − 5 × unfinished_orders_at_cutoff
+```
+
+The idle-driver cost is charged when available capacity and dispatchable orders coexist. The terminal unfinished-order penalty applies at the episode cutoff. Batch-savings reward is zero because batching is not implemented. The UI/game winner is determined by game points and tie-breakers, not the shaped RL return.
+
+## RL problem and algorithms
+
+At each simulated minute, the agent receives a fixed-size observation with **1,849 values**: 16 driver records × 11 features, 64 order records × 10 features, a 16 × 64 driver/order ETA matrix, and 9 global features. Features represent positions, availability and movement state, estimated time until a driver is free, order age and preparation/deadline estimates, ETA pairs, demand, remaining horizon, traffic, and resource counts. The padded representation supports up to 16 drivers and 64 dispatchable orders. Invalid driver/order pairs are masked.
+
+The discrete action space has **1,025 actions**: 16 × 64 driver/order assignments and one `WAIT` action. A dispatch action does not advance time, so multiple assignments can be made before `WAIT` advances the simulation by one minute.
+
+- **DQN:** pairwise action-value network (128 hidden units) with masked Double-DQN targets, uniform replay buffer (20,000 transitions), batch size 128, learning rate 0.0003, discount 0.99, learning begins after 32 transitions, updates every four steps, target synchronization every 1,000 steps, and epsilon annealed from 1.0 to 0.05.
+- **PPO:** masked categorical pairwise policy (128 hidden units) and value network (256 hidden units), clipped objective (clip 0.2), discount 0.99, GAE λ 0.95, 8 update epochs, minibatches of 128, and learning rate 0.0003. PPO samples actions during training; evaluation and game play use deterministic masked action selection.
+- Both models train for 500 episodes by default with randomized demand, restaurant count, driver count, and traffic. Shaped rewards are scaled by 0.1 for neural-network updates. The best checkpoint is selected by mean shaped reward on fixed validation scenarios. Evaluation uses the same simulator and action masks as training.
+
+## Current results
+
+The table below summarizes the saved five-seed parameter sweep for normal traffic with five restaurants and eight drivers. “Points” equal 10 × completed deliveries in this game. The score and RL reward can rank strategies differently because RL reward also penalizes waiting, lateness, travel, idle capacity, and unfinished orders.
+
+| Policy | Low demand: delivered / points | Medium demand: delivered / points | High demand: delivered / points |
+|---|---:|---:|---:|
+| Nearest Driver | 121.2 / 1,212 | 307.4 / 3,074 | 437.8 / 4,378 |
+| Oldest / Most Urgent | 121.0 / 1,210 | 305.0 / 3,050 | 356.2 / 3,562 |
+| Minimum Estimated Delivery Time | 121.2 / 1,212 | 307.8 / 3,078 | 452.4 / 4,524 |
+| DQN | 120.6 / 1,206 | 306.8 / 3,068 | 444.4 / 4,444 |
+| PPO | 121.2 / 1,212 | 308.6 / 3,086 | 440.8 / 4,408 |
+
+At medium demand PPO has the highest mean game score in this sweep, while Minimum Estimated Delivery Time is nearly tied. At high demand, Minimum Estimated Delivery Time completes the most deliveries. DQN has the best mean shaped RL reward in that high-demand comparison, even though it does not have the highest game score. The learned policies are competitive in some conditions but do **not** outperform the heuristics consistently. The full sweep includes isolated traffic, restaurant-count, and driver-count changes plus undersupplied and well-resourced high-demand cases; see `results/parameter_report.md` for all configurations and variability.
+
+The project report is available in [`output/pdf/munchkin_rl_report.pdf`](output/pdf/munchkin_rl_report.pdf), with editable LaTeX source in [`reports/munchkin_rl_report/main.tex`](reports/munchkin_rl_report/main.tex). The report describes the experiment and current results; rerun the parameter report commands above to reproduce the comparisons from the included checkpoints.
+
+## Repository layout
 
 ```text
 food_delivery_game/
-  baselines/        Three heuristic dispatch policies
-  __main__.py       Tkinter entry point
-  compare.py        Command-line baseline comparison
-  config.py         Simulation configuration
-  entities.py       Restaurant, driver, and order data models
-  environment.py    Discrete-time delivery simulation
-  simulation/       Matched episode runner and metrics
-  rl/               DQN/PPO agents, training, and matched-seed evaluation
-  ui.py             Map, controls, and live status display
+  baselines/       Nearest Driver, Oldest/Most Urgent, Minimum ETA
+  simulation/      Shared episode runner and evaluation metrics
+  rl/              Observation, DQN/PPO, training, and reports
+  __main__.py      Tkinter game entry point
+  config.py        Shared simulation settings
+  environment.py   Order, restaurant, driver, and traffic simulation
+  ui.py            Interactive two-player game interface
+models/            Trained DQN/PPO checkpoints and metadata
+results/           Generated CSV and Markdown experiment reports
+reports/           Two-page LaTeX project report and chart source
+output/pdf/         Rendered report PDF
 ```
 
-## Current scope
+## Reproducibility notes
 
-The environment supports order arrivals, preparation, driver dispatch, travel, pickups, and deliveries. The three baselines are nearest driver, oldest/most urgent ready order, and minimum estimated delivery time. DQN and PPO use masked pairwise neural policies trained with replay learning and clipped policy optimization, respectively. The comparison runners report deliveries, reward points, delivery time, and travel distance over matched episode seeds. The GUI pits two selected strategies against one another.
-
-The current simulator uses a lightweight 2D coordinate map and discrete simulated minutes. Orders arrive at the start of each minute; deliveries can be completed during that minute using the driver's remaining travel distance after pickup. Orders unfinished at the match cutoff remain pending and are counted in the final statistics. The simulator is an educational model, not a reconstruction of any commercial delivery platform.
+The CLI experiment tools use fixed or explicitly supplied seeds and matched scenarios so every strategy is compared on the same random conditions. Training is stochastic and can vary with hardware and library versions; checkpoints record the observation version and training metadata. Keep the `.pt` files together with their `.meta.json` files when sharing trained models. If the observation version changes, retrain both models before evaluating them.
