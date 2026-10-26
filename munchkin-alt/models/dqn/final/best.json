@@ -1,0 +1,32 @@
+{
+  "algo": "dqn",
+  "agent_cfg": {
+    "arch": "pairwise",
+    "hidden": 128,
+    "gamma": 0.99,
+    "reward_scale": 0.1,
+    "lr": 0.0005,
+    "grad_clip": 10.0,
+    "batch_size": 128,
+    "buffer_size": 60000,
+    "learning_starts": 3000,
+    "train_freq": 4,
+    "target_update": 1000,
+    "eps_start": 1.0,
+    "eps_end": 0.05,
+    "eps_decay_frac": 0.4,
+    "total_steps": 300000,
+    "val_every": 20000,
+    "val_seeds_per_scenario": 4
+  },
+  "reward_hash": "8f0ad69c45",
+  "batching": false,
+  "seed": 0,
+  "run_name": "dqn_s0",
+  "step": 260000,
+  "val_reward": 10.935368279648076,
+  "obs_version": 1,
+  "obs_dim": 481,
+  "n_actions": 193,
+  "git_commit": "unknown"
+}

@@ -31,7 +31,7 @@ From the project root:
 python3 -m food_delivery_game
 ```
 
-When the game opens, enter both player names. Each player then chooses a strategy. Set the shared restaurant count, driver count, and order arrival rate in the controls below the two maps. Press **Start match** to begin, or use **Step one game minute** to advance the active player's simulation.
+When the game opens, enter both player names. Each player then chooses a strategy (heuristic baselines or trained DQN/PPO). Set the shared restaurant count, driver count, arrival rate, and traffic condition in the controls below the maps. Use the **Speed controls** (`1×`, `2×`, `5×`, `10×`) to speed up or slow down the match at any time. Press **Start match** to begin, or use **Step one game minute** to step through decisions manually. A **Map Legend** above the active clock clarifies all symbols for restaurants, cooking/ready food, delivered orders, and drivers.
 
 ## Game rules and assumptions
 

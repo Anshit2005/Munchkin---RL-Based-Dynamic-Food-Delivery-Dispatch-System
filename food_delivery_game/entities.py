@@ -1,6 +1,6 @@
 """Data objects used by the delivery environment."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 
 
@@ -42,6 +42,7 @@ class Driver:
     order_id: int | None = None
     destination: Point | None = None
     remaining_distance: float = 0.0
+    last_step_path: list[tuple[Point, Point, str]] = field(default_factory=list)
 
 
 @dataclass

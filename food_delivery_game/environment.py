@@ -268,6 +268,7 @@ class DeliveryEnvironment:
 
     def _advance_drivers(self) -> None:
         for driver in self.drivers:
+            driver.last_step_path = []
             if driver.status == DriverStatus.AVAILABLE or driver.destination is None:
                 continue
             speed = self.config.travel_speed * self.traffic_profile[min(self.time, len(self.traffic_profile) - 1)]
@@ -287,6 +288,8 @@ class DeliveryEnvironment:
             while travel_budget > 0 and driver.status != DriverStatus.AVAILABLE:
                 if driver.destination is None:
                     break
+                seg_start = driver.location
+                seg_type = "restaurant" if driver.status == DriverStatus.TO_RESTAURANT else "customer"
                 distance_to_destination = driver.remaining_distance
                 distance_travelled = min(travel_budget, distance_to_destination)
                 self.total_travel_distance += distance_travelled
@@ -298,9 +301,13 @@ class DeliveryEnvironment:
                         driver.location.y + (driver.destination.y - driver.location.y) * fraction,
                     )
                     driver.remaining_distance -= distance_travelled
+                    if seg_start.distance_to(driver.location) > 0.01:
+                        driver.last_step_path.append((seg_start, driver.location, seg_type))
                     break
 
                 driver.location = driver.destination
+                if seg_start.distance_to(driver.location) > 0.01:
+                    driver.last_step_path.append((seg_start, driver.location, seg_type))
                 order = next((o for o in self.orders if o.order_id == driver.order_id), None)
                 if order is None:
                     self._release_driver(driver)
